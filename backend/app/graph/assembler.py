@@ -147,24 +147,39 @@ def assemble_graph(
     # 5. Add Finding nodes and FLAGGED_BY relationships if findings are provided
     if findings:
         for f in findings:
-            f_id = getattr(f, "id", str(f.get("id", "")))
+            if isinstance(f, dict):
+                f_id = f.get("id", "")
+                f_dim = f.get("dimension", "")
+                f_sev = f.get("severity", "")
+                f_conf = f.get("confidence", "")
+                f_desc = f.get("description", "")
+                f_ev_file = f.get("evidence_file", "")
+                f_ev_line = f.get("evidence_line")
+            else:
+                f_id = getattr(f, "id", "")
+                f_dim = getattr(f, "dimension", "")
+                f_sev = getattr(f, "severity", "")
+                f_conf = getattr(f, "confidence", "")
+                f_desc = getattr(f, "description", "")
+                f_ev_file = getattr(f, "evidence_file", "")
+                f_ev_line = getattr(f, "evidence_line", None)
+
             add_node(
                 node_id=f_id,
                 label="Finding",
                 name=f_id,
                 props={
-                    "dimension": getattr(f, "dimension", f.get("dimension", "")),
-                    "severity": getattr(f, "severity", f.get("severity", "")),
-                    "confidence": getattr(f, "confidence", f.get("confidence", "")),
-                    "description": getattr(f, "description", f.get("description", "")),
-                    "evidence_file": getattr(f, "evidence_file", f.get("evidence_file", "")),
-                    "evidence_line": getattr(f, "evidence_line", f.get("evidence_line", None)),
+                    "dimension": f_dim,
+                    "severity": f_sev,
+                    "confidence": f_conf,
+                    "description": f_desc,
+                    "evidence_file": f_ev_file,
+                    "evidence_line": f_ev_line,
                 },
             )
-            ev_file = getattr(f, "evidence_file", f.get("evidence_file", ""))
-            if ev_file in node_ids:
+            if f_ev_file in node_ids:
                 edges.append({
-                    "source_id": ev_file,
+                    "source_id": f_ev_file,
                     "rel_type": "FLAGGED_BY",
                     "target_id": f_id,
                 })
