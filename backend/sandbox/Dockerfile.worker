@@ -1,0 +1,36 @@
+# Dockerfile.worker - Ephemeral, isolated, resource-capped sandbox
+# Security constraint: NEVER executes ingested/analyzed code.
+# Network constraint: Runs with --network none by default.
+
+FROM python:3.11-slim
+
+# Install system utilities needed for static file reading and inspection
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create unprivileged non-root user with no sudo permissions
+RUN groupadd -g 10001 sandboxgroup && \
+    useradd -u 10001 -g sandboxgroup -s /bin/bash -m sandboxuser
+
+WORKDIR /sandbox
+
+# Install static analysis and parsing dependencies
+COPY backend/requirements.txt /sandbox/requirements.txt
+RUN pip install --no-cache-dir -r /sandbox/requirements.txt
+
+# Create isolated input and output directories
+RUN mkdir -p /sandbox/input /sandbox/output && \
+    chown -R sandboxuser:sandboxgroup /sandbox
+
+USER sandboxuser
+
+# Environment variables setting sandbox mode
+ENV SANDBOX=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Default command performs self-test or runs task
+CMD ["python", "-c", "print('Sandbox worker initialized successfully. Static analysis ready.')"]

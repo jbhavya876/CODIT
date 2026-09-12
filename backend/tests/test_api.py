@@ -22,11 +22,26 @@ from app import create_app  # noqa: E402
 from database import seed_data  # noqa: E402
 
 
+class ApiTestClient:
+    def __init__(self, app):
+        from starlette.testclient import TestClient
+        self._tc = TestClient(app, raise_server_exceptions=False)
+
+    def get(self, url, **kwargs):
+        res = self._tc.get(url, **kwargs)
+        res.get_json = res.json
+        return res
+
+    def post(self, url, **kwargs):
+        res = self._tc.post(url, **kwargs)
+        res.get_json = res.json
+        return res
+
+
 @pytest.fixture()
 def client():
     app = create_app({"GRAPH_BACKEND": "demo"})
-    app.config.update(TESTING=True)
-    return app.test_client()
+    return ApiTestClient(app)
 
 
 # --- basics ----------------------------------------------------------------------

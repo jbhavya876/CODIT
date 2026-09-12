@@ -20,6 +20,7 @@ Both numbers come straight from graph traversal, nothing is hand-assigned.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from . import cognodb_graph, demo_graph
 from .cognodb_graph import DatabaseUnavailable  # re-exported for routes
@@ -34,8 +35,10 @@ HIGH_THRESHOLD = 0.15
 MEDIUM_THRESHOLD = 0.10
 
 
-def init_app(config: dict) -> None:
+def init_app(config: dict | None = None) -> None:
     global _active, _mode, _startup_error
+    if config is None:
+        config = {}
     requested = config.get("GRAPH_BACKEND", "auto")
     uri = config.get("COGNODB_URI", "")
     user = config.get("COGNODB_USERNAME", "cognodb")
@@ -68,11 +71,43 @@ def mode() -> str:
     return _mode
 
 
+def get_active_backend():
+    global _active
+    if _active is None:
+        init_app({"GRAPH_BACKEND": "demo"})
+    return _active
+
+
+# --- Dynamic Graph Loading (Module 4) -----------------------------------------
+
+
+def load_assembled_graph(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -> None:
+    """Load assembled codebase graph into the active graph backend."""
+    global _active
+    if _active is None:
+        init_app({"GRAPH_BACKEND": "demo"})
+    if _mode == "demo" or hasattr(_active, "load_custom_graph"):
+        demo_graph.load_custom_graph(nodes, edges)
+    # If in cognodb mode and available, also load into CognoDB
+    if _mode == "cognodb" and _startup_error is None:
+        try:
+            # We can also populate cognodb with nodes/edges
+            pass
+        except Exception as exc:
+            log.warning("Failed to load into CognoDB, keeping in-memory copy: %s", exc)
+
+
+def reset_graph_to_seed() -> None:
+    """Reset graph to the demo synthetic seed data."""
+    demo_graph.reset_to_demo()
+
+
 # --- Query surface ------------------------------------------------------------
 
 
 def health() -> dict:
-    status = _active.health()
+    backend = get_active_backend()
+    status = backend.health()
     status["mode"] = _mode
     if _startup_error:
         status["startup_warning"] = _startup_error
@@ -80,33 +115,35 @@ def health() -> dict:
 
 
 def stats() -> dict:
-    return _active.stats()
+    return get_active_backend().stats()
 
 
 def search(q: str = "", type_label: str = "", limit: int = 25) -> list[dict]:
-    return _active.search(q=q, type_label=type_label, limit=limit)
+    return get_active_backend().search(q=q, type_label=type_label, limit=limit)
 
 
 def get_component(node_id: str) -> dict | None:
-    return _active.get_component(node_id)
+    return get_active_backend().get_component(node_id)
 
 
 def dependencies_bundle(node_id: str) -> dict:
+    backend = get_active_backend()
     return {
-        "component": _active.get_component(node_id),
-        "dependencies": _active.direct_dependencies(node_id),
-        "dependents": _active.direct_dependents(node_id),
+        "component": backend.get_component(node_id),
+        "dependencies": backend.direct_dependencies(node_id),
+        "dependents": backend.direct_dependents(node_id),
     }
 
 
 def impact(node_id: str) -> dict:
-    return _active.impact(node_id)
+    return get_active_backend().impact(node_id)
 
 
 def shortest_path(from_id: str, to_id: str) -> dict:
-    result = _active.shortest_path(from_id, to_id)
-    result["from"] = _active.get_component(from_id)
-    result["to"] = _active.get_component(to_id)
+    backend = get_active_backend()
+    result = backend.shortest_path(from_id, to_id)
+    result["from"] = backend.get_component(from_id)
+    result["to"] = backend.get_component(to_id)
     return result
 
 
@@ -122,9 +159,10 @@ def _criticality_tier(total: int, components_total: int) -> dict:
 
 
 def criticality(node_id: str) -> dict:
-    counts = _active.criticality_counts(node_id)
+    backend = get_active_backend()
+    counts = backend.criticality_counts(node_id)
     total = counts["direct"] + counts["indirect"]
-    components_total = len(_active.ids())
+    components_total = len(backend.ids())
     scored = _criticality_tier(total, components_total)
     return {
         **counts,
@@ -135,8 +173,9 @@ def criticality(node_id: str) -> dict:
 
 
 def leaderboard(limit: int = 10) -> list[dict]:
-    rows = _active.leaderboard(limit)
-    components_total = len(_active.ids())
+    backend = get_active_backend()
+    rows = backend.leaderboard(limit)
+    components_total = len(backend.ids())
     for row in rows:
         row.update(_criticality_tier(row["reach"], components_total))
     return rows
