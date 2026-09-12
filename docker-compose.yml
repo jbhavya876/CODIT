@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - GRAPH_BACKEND=auto
+      - COGNODB_URI=bolt://graph-db:7687
+      - COGNODB_USERNAME=neo4j
+      - COGNODB_PASSWORD=your_password_here
+      - PORT=8000
+      - MAX_REPO_SIZE_MB=200
+      - MAX_FILE_COUNT=5000
+      - INGESTION_TIMEOUT_SECONDS=120
+    depends_on:
+      - graph-db
+    restart: unless-stopped
+
+  sandbox-worker:
+    build:
+      context: .
+      dockerfile: backend/sandbox/Dockerfile.worker
+    network_mode: "none"  # Non-negotiable Constraint 5: zero network egress
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'     # Constraint 4: 1 vCPU limit
+          memory: 1024M   # Constraint 4: 1024MB memory limit
+    restart: "no"
+
+  graph-db:
+    image: neo4j:5.20-community
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/your_password_here
+    volumes:
+      - neo4j_data:/data
+
+volumes:
+  neo4j_data:

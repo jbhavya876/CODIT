@@ -108,19 +108,21 @@ def generate_blast_radius_diagram(
     ]
 
     root_sanitized = _sanitize_id(root_id)
-    root_name = impact_data.get("root", {}).get("component", {}).get("name") or root_id
+    root_info = impact_data.get("root") or {}
+    root_comp = root_info.get("component") or {}
+    root_name = root_comp.get("name") or root_id
     lines.append(f"  {root_sanitized}[\"💥 ORIGIN: {root_name}\"]:::rootNode")
 
-    direct = impact_data.get("direct", [])
-    indirect = impact_data.get("indirect", [])
+    direct = impact_data.get("direct") or []
+    indirect = impact_data.get("indirect") or []
 
     # Group direct (Hop 1)
     if direct:
         lines.append("  subgraph Direct_Impact[\"Direct Dependents (Hop 1)\"]")
         for d in direct[:10]:
-            comp = d.get("component", {})
+            comp = (d or {}).get("component") or {}
             cid = _sanitize_id(comp.get("id", "unknown"))
-            cname = comp.get("name", comp.get("id"))
+            cname = comp.get("name", comp.get("id", "unknown"))
             lines.append(f"    {cid}[\"{cname}\"]:::directNode")
             lines.append(f"    {cid} -.->|reaches| {root_sanitized}")
         lines.append("  end")
@@ -129,10 +131,10 @@ def generate_blast_radius_diagram(
     if indirect:
         lines.append("  subgraph Transitive_Impact[\"Transitive Dependents (Hops 2..6)\"]")
         for ind in indirect[:15]:
-            comp = ind.get("component", {})
+            comp = (ind or {}).get("component") or {}
             cid = _sanitize_id(comp.get("id", "unknown"))
-            cname = comp.get("name", comp.get("id"))
-            depth = ind.get("depth", 2)
+            cname = comp.get("name", comp.get("id", "unknown"))
+            depth = (ind or {}).get("depth", 2)
             lines.append(f"    {cid}[\"{cname} (depth {depth})\"]:::indirectNode")
             # Connect to its next step in chain if available
             chain_nodes = ind.get("chain_nodes", [])

@@ -1,18 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
- * Tiny REST client. The browser only ever talks to our Flask backend —
- * CognoDB credentials never leave the server. VITE_API_BASE stays empty when
- * the frontend and backend are served from one origin (or via the Vite dev
- * proxy); set it only for split frontend/backend hosting.
+ * REST client for Dependency Detective & Codebase Audit Platform.
  */
 
 const API_BASE = import.meta.env.VITE_API_BASE || ''
 
-async function request(path) {
+async function request(path, options = {}) {
   let res
+  const url = `${API_BASE}/api${path}`
   try {
-    res = await fetch(`${API_BASE}/api${path}`)
+    res = await fetch(url, options)
   } catch {
     throw { status: 0, code: 'network_error', message: 'Unable to reach the server.' }
   }
@@ -42,6 +40,7 @@ const qs = (params) => {
 }
 
 export const api = {
+  // --- Core Graph Explorer Endpoints (Preserved) ---
   health: () => request('/health'),
   stats: () => request('/stats'),
   search: (q, opts = {}) => request(`/components${qs({ q, type: opts.type, limit: opts.limit })}`),
@@ -51,12 +50,40 @@ export const api = {
   criticality: (id) => request(`/components/${id}/criticality`),
   leaderboard: (limit = 8) => request(`/criticality${qs({ limit })}`),
   path: (from, to) => request(`/path${qs({ from, to })}`),
+
+  // --- Module 1: Ingestion Pipeline ---
+  ingestStatus: () => request('/ingest/status'),
+  ingestPublic: (url, ref = 'main') =>
+    request('/ingest/public', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, ref }),
+    }),
+  ingestPrivate: (repo, token, branch) =>
+    request('/ingest/private', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repo, token, branch }),
+    }),
+  ingestZip: (formData) =>
+    request('/ingest/zip', {
+      method: 'POST',
+      body: formData,
+    }),
+
+  // --- Modules 5-8: Audit, Scoring, Roadmap & Reports ---
+  runAnalysis: (goal = 'production') =>
+    request('/analyze/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goal }),
+    }),
+  getReport: () => request('/report'),
+  getBlastRadiusDiagram: (id) => request(`/report/diagram/impact/${encodeURIComponent(id)}`),
+  getMarkdownReportUrl: () => `${API_BASE}/api/report/markdown`,
+  getHtmlReportUrl: () => `${API_BASE}/api/report/html`,
 }
 
-/**
- * Data-fetching hook driving the three UI states the assignment asks for:
- * loading / error (with retry) / empty-or-data.
- */
 export function useFetch(fn, deps = []) {
   const [state, setState] = useState({ data: null, loading: true, error: null })
   const fnRef = useRef(fn)

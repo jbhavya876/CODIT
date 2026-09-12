@@ -19,17 +19,21 @@ export function parseRoute(hash) {
   const parts = pathPart.split('/').filter(Boolean)
 
   if (parts.length === 0) return { name: 'dashboard' }
+  if (parts[0] === 'audit') return { name: 'audit' }
+  if (parts[0] === 'ingest') return { name: 'ingest' }
   if (parts[0] === 'c' && parts[1] && parts[2] === 'impact')
     return { name: 'impact', id: parts[1] }
   if (parts[0] === 'c' && parts[1])
     return { name: 'component', id: parts[1], action: params.get('path') }
   if (parts[0] === 'path')
     return { name: 'path', from: params.get('from') || '', to: params.get('to') || '' }
-  return { name: 'notfound' }
+  return { name: 'dashboard' }
 }
 
 export const href = {
   dashboard: () => '#/',
+  audit: () => '#/audit',
+  ingest: () => '#/ingest',
   component: (id) => `#/c/${id}`,
   impact: (id) => `#/c/${id}/impact`,
   path: (from, to) => `#/path?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,

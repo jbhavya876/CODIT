@@ -1,25 +1,40 @@
-# One-service deployment on Render (https://render.com) — "New > Blueprint",
-# point at this repo, set the secret env vars when prompted.
-#
-# The Flask app serves the built React frontend itself (see backend/app/__init__.py),
-# so a single free web service hosts the entire product.
+# Production deployment on Render (https://render.com)
+# Unified single-service deployment: FastAPI serves the built React frontend directly.
 
 services:
   - type: web
-    name: dependency-detective
+    name: codebase-audit-platform
     runtime: python
-    plan: free
+    plan: starter
     buildCommand: >-
       pip install -r backend/requirements.txt
       && npm --prefix frontend ci
       && npm --prefix frontend run build
-    startCommand: cd backend && gunicorn run:app --bind 0.0.0.0:$PORT --workers 2
+    startCommand: cd backend && uvicorn run:app --host 0.0.0.0 --port $PORT --workers 2
     envVars:
       - key: GRAPH_BACKEND
-        value: cognodb
+        value: auto
       - key: COGNODB_URI
-        sync: false        # paste your instance's Bolt URI in the dashboard
+        sync: false
       - key: COGNODB_USERNAME
         value: cognodb
       - key: COGNODB_PASSWORD
-        sync: false        # paste your instance password in the dashboard
+        sync: false
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_APP_PRIVATE_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ROADMAP_MODEL
+        value: claude-sonnet-5
+      - key: OSV_API_URL
+        value: https://api.osv.dev/v1/query
+      - key: MAX_REPO_SIZE_MB
+        value: "200"
+      - key: MAX_FILE_COUNT
+        value: "5000"
+      - key: INGESTION_TIMEOUT_SECONDS
+        value: "120"
+      - key: REPORT_RETENTION_HOURS
+        value: "24"
