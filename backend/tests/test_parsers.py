@@ -135,8 +135,8 @@ EXPOSE 8000
             path=".env.example",
             size=100,
             language="env",
-            content="""DATABASE_URL=postgres://user:pass@localhost:5432/db
-AWS_ACCESS_KEY_ID=test
+            content="""DATABASE_URL=postgres://user:your_password_here@localhost:5432/db
+AWS_ACCESS_KEY_ID=your_aws_key_here
 STRIPE_SECRET_KEY=your_stripe_key_here
 """,
         ),

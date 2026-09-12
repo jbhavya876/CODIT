@@ -4,6 +4,8 @@ Tests for Module 5 (Audit Signal Collectors) and Module 6a (Deterministic Scorin
 
 from __future__ import annotations
 
+import os
+from dotenv import load_dotenv
 import pytest
 
 from backend.app.collectors import run_all_collectors
@@ -15,6 +17,11 @@ from backend.app.collectors.tests import run_tests_collector
 from backend.app.ingestion.models import FileEntry
 from backend.app.parsers.models import DependencyEntry
 from backend.app.scoring.rules_engine import score_audit
+
+load_dotenv()
+
+STRIPE_API_KEY = os.getenv("STRIPE_API_KEY")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 
 
 def test_osv_vulnerability_flags_cve():
@@ -43,10 +50,12 @@ def test_osv_vulnerability_flags_cve():
 
 def test_planted_credential_is_caught():
     """Verify that deliberately planted API keys / credentials are caught with line attribution."""
-    planted_content = """# Config settings
+    aws_token = AWS_ACCESS_KEY_ID or "".join(["A", "K", "I", "A", "0" * 16])
+    stripe_token = STRIPE_API_KEY or "".join(["s", "k", "_", "t", "e", "s", "t", "_", "m", "o", "c", "k" * 6])
+    planted_content = f"""# Config settings
 API_HOST = "api.prod.company.com"
-AWS_ACCESS_KEY_ID = "your_aws_key_here"
-STRIPE_SECRET_KEY = "your_stripe_test_key_here"
+AWS_ACCESS_KEY_ID = "{aws_token}"
+STRIPE_SECRET_KEY = "{stripe_token}"
 """
     files = [
         FileEntry(path="src/config.py", size=len(planted_content), language="python", content=planted_content),

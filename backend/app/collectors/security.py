@@ -168,11 +168,10 @@ def scan_for_committed_secrets(files: List[FileEntry]) -> List[AuditFinding]:
         lines = entry.content.splitlines()
         for line_idx, line in enumerate(lines, 1):
             line_str = line.strip()
-            # Skip comments that obviously say placeholder/replace-me
-            if "replace-me" in line_str.lower() or "example" in line_str.lower() and "sk_" not in line_str:
-                if entry.path.endswith(".example") or "test" in entry.path.lower() and "fake" in line_str.lower():
-                    # Still catch deliberately planted test secrets if requested
-                    pass
+            # Skip example or template documentation placeholders
+            if entry.path.endswith(".example") or ".template" in entry.path.lower():
+                if "replace-me" in line_str.lower() or "your_" in line_str.lower() or "placeholder" in line_str.lower():
+                    continue
 
             for pattern, secret_type, severity, rule_id in SECRET_PATTERNS:
                 match = re.search(pattern, line)
