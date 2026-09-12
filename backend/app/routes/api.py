@@ -1,5 +1,5 @@
 """
-REST API for Dependency Detective & Codebase Audit Platform.
+REST API for Codit — Intelligent Codebase Audit & Architecture Platform.
 
 Contract:
   * success -> the payload itself (object or list)
@@ -15,8 +15,8 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-from ..services import graph_service
-from ..services.graph_service import DatabaseUnavailable
+from backend.app.services import graph_service
+from backend.app.services.graph_service import DatabaseUnavailable
 
 router = APIRouter(prefix="/api", tags=["core"])
 

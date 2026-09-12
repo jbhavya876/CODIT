@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
- * REST client for Dependency Detective & Codebase Audit Platform.
+ * REST client for Codit — Intelligent Codebase Audit & Architecture Platform.
  */
 
 const API_BASE = import.meta.env.VITE_API_BASE || ''

@@ -5,10 +5,12 @@ import { href } from '../router.js'
 
 export const TYPE_META = {
   Service: { hex: '#38bdf8', text: 'text-sky-300', bg: 'bg-sky-400' },
+  Module: { hex: '#38bdf8', text: 'text-sky-300', bg: 'bg-sky-400' },
   Database: { hex: '#34d399', text: 'text-emerald-300', bg: 'bg-emerald-400' },
   API: { hex: '#fbbf24', text: 'text-amber-300', bg: 'bg-amber-400' },
   Library: { hex: '#a78bfa', text: 'text-violet-300', bg: 'bg-violet-400' },
   Infrastructure: { hex: '#fb7185', text: 'text-rose-300', bg: 'bg-rose-400' },
+  Finding: { hex: '#f43f5e', text: 'text-rose-300', bg: 'bg-rose-400' },
   Team: { hex: '#94a3b8', text: 'text-slate-300', bg: 'bg-slate-400' },
 }
 
@@ -20,6 +22,8 @@ export const REL_VERBS = {
   USES: 'uses',
   DEPLOYED_ON: 'is deployed on',
   OWNED_BY: 'is owned by',
+  IMPORTS: 'imports',
+  FLAGGED_BY: 'flagged by',
 }
 
 export function Dot({ type, className = '' }) {

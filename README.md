@@ -1,93 +1,3 @@
-# 🔍 Dependency Detective
-
-**Graph-powered system dependency & impact analysis, backed by CognoDB.**
-
-> **If this component fails or changes, what else could be affected — and why?**
-
-Dependency Detective is an interactive explorer for a system's component graph:
-services, databases, third-party APIs, libraries and infrastructure. Pick any
-component and it answers, with live multi-hop Cypher traversals:
-
-- **What does it depend on?** (and who depends on it — its direct dependents)
-- **What breaks if it breaks?** — the full blast radius, direct **and** indirect
-- **How are two components connected?** — every dependency chain, not just a yes/no
-- **Why does A depend on B?** — explained as the actual relationship path
-- **How critical is it?** — a score derived purely from graph reachability
-
-**Live demo:** <!-- TODO: replace after deployment --> _deploy with `render.yaml`, then paste the URL here_
-**Demo video:** <!-- TODO: link 2-3 min screen recording (script below) -->
-
----
-
-## The problem
-
-Modern systems are webs: the Customer Portal talks to Checkout, which talks to
-Payment, which talks to Auth, which reads from PostgreSQL. When PostgreSQL goes
-down the incident is never *just* PostgreSQL — but dependency knowledge lives in
-people's heads, stale wiki pages, and tribal memory. Answering "who do we page
-if Redis dies?" or "can we safely upgrade PyJWT?" requires walking chains of
-relationships of unknown depth across heterogeneous components.
-
-## The solution
-
-Model the system as a **graph** — components as nodes, real-world dependency
-kinds as typed edges — and answer every question above with a traversal:
-
-```
-SELECT component → explore relationships → traverse the graph
-     → analyse impact → explain paths → measure criticality
-```
-
-The graph is not an implementation detail here; it *is* the product. Every
-feature is a Cypher query.
-
----
-
-## Why a graph database?
-
-Dependency analysis is fundamentally **relationship-centric**. Three questions
-this app answers make that concrete:
-
-1. **Variable-depth traversal.** *"Find every service affected if this database
-   fails — regardless of how many levels sit between them."* The hop count is
-   not known up front; it is part of the answer.
-
-2. **Heterogeneous edges.** A single chain can run
-   `Service → Service → API → Service → Database` — different node types,
-   different relationship meanings per hop.
-
-3. **Path discovery, not just existence.** *"How is Customer Portal connected to
-   PostgreSQL?"* wants the path itself returned.
-
-In a relational schema, dependencies would be spread across join tables
-(`service_deps`, `service_api_calls`, `service_db_access`, …), and this app's
-headline query would become a **recursive CTE unioning one JOIN per relationship
-table per hop level**, with cycle guards, and a second query to reconstruct the
-path:
-
-```sql
--- the shape of the relational answer (sketch)
-WITH RECURSIVE affected AS (
-  SELECT service_id, 1 AS depth FROM service_db_access WHERE db_id = $1
-  UNION SELECT service_id, 1 FROM service_uses_library WHERE ...
-  UNION ...
-  UNION ALL
-  SELECT sd.service_id, a.depth + 1
-  FROM service_deps sd JOIN affected a ON sd.depends_on_id = a.service_id
-  WHERE a.depth < 6            -- and the same again for every other table...
-)
-SELECT DISTINCT service_id, MIN(depth) FROM affected GROUP BY service_id;
-```
-
-Equivalent Cypher — one pattern over the typed graph:
-
-```cypher
-MATCH (affected:Component)-[:DEPENDS_ON|CALLS|READS_FROM|WRITES_TO|USES|DEPLOYED_ON*1..6]->(:Component {id: $id})
-```
-
-SQL *can* express this (recursion exists), but the query fights the schema:
-the dependency network is implicit across many tables instead of being the
-first-class structure you query. The graph model makes the traversal natural,
 readable, and easy to extend — adding a new relationship kind is a data change,
 not a schema migration plus a rewrite of every recursive query.
 
@@ -188,170 +98,173 @@ be awkward relationally (see "Why a graph database?").
 
 **Criticality scoring** — deliberately simple, entirely graph-derived:
 
-```
-share  = total_affected / (all_components − 1)
-HIGH   if share ≥ 15%      MEDIUM if share ≥ 10%      LOW otherwise
-```
+# 🛡️ CODIT — Intelligent Codebase Audit & Architecture Platform
 
-In the seeded system: Kubernetes (35%) and PostgreSQL (20%) are HIGH; a niche
-library like Axios (~2%) is LOW.
+**Production-grade codebase intelligence, static AST security audits, graph-native blast-radius modeling, and explainable machine learning.**
 
 ---
 
-## API
+## 🎯 Overview
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/health` | liveness + which graph backend is active |
-| `GET /api/stats` | node/relationship counts |
-| `GET /api/components?q=&type=&limit=` | search (validated type, capped limit) |
-| `GET /api/components/:id` | component + owning team |
-| `GET /api/components/:id/dependencies` | direct deps + direct dependents |
-| `GET /api/components/:id/impact` | multi-hop blast radius with chains |
-| `GET /api/components/:id/criticality` | direct/indirect/total + tier + share |
-| `GET /api/criticality?limit=` | leaderboard |
-| `GET /api/path?from=&to=` | all dependency chains, shortest first |
+**CODIT** is an autonomous, production-ready codebase audit and architecture intelligence platform. Given any software repository—via a public GitHub URL, a scoped private GitHub token, or a zero-retention local ZIP archive—CODIT constructs:
 
-Errors are never stack traces: `404 not_found` · `400 bad_request` ·
-`503 database_unavailable` (CognoDB down/misconfigured) — each rendered as a
-designed UI state with retry. The app also implements loading, empty
-(leaf component), and "try the reverse direction" no-path states.
-
-```bash
-curl "http://localhost:8000/api/components/db-postgresql/impact"
-curl "http://localhost:8000/api/path?from=svc-customer-portal&to=db-postgresql"
-```
+1. **A High-Fidelity Property Graph**: Maps services, internal modules, functions, external libraries, and relational dependencies with live Cypher traversals.
+2. **Deep Static AST Audit**: Statically parses abstract syntax trees across Python, TypeScript, and JavaScript using Tree-sitter without executing untrusted code.
+3. **Open-Source ML Models (ONNX & SHAP)**:
+   - **ONNX Defect Model (`defect_model.onnx`)**: Multi-output ensemble regression predicting structural Fragility Index ($0.0 - 1.0$), Defect Risk Tier (`Low`, `Moderate`, `High`, `Critical`), Maintainability Index ($0 - 100$), and Technical Debt remediation person-days.
+   - **SHAP Game-Theoretic Explainability**: Computes exact Shapley attributions ($\phi_i$) decomposing how architectural signals (AST complexity, circular dependencies, test isolation, secret density, duplication) add or subtract points from the baseline score.
+4. **Prioritized Engineering Roadmap**: Synthesizes concrete remediation phases (Immediate Blockers, Core Reliability, Post-Launch Hardening) with exact `file:line` citations.
+5. **Interactive Blueprints**: Dynamically renders architectural call graphs and multi-hop failure propagation cascades with bundled Mermaid.js.
 
 ---
 
-## Setup
+## 🔒 Security & Sandboxing Guarantees
 
-### 1. Create a CognoDB instance
+- **Zero Untrusted Code Execution**: All source files are parsed statically. Never imports, evaluates, or runs target code.
+- **Pre-Extraction Defense**:
+  - **Zip-Slip Guard**: Strictly validates canonical destination paths to prevent directory traversal attacks.
+  - **Zip-Bomb Guard**: Enforces strict quotas before writing to disk (rejects cumulative uncompressed size $> 200\text{ MB}$, file count $> 5,000$, or directory depth $> 20$).
+- **Zero Retention**: Uploaded ZIP archives and ephemeral cloned repositories are purged immediately post-audit (Constraint 7).
+- **Hard Security Cap**: If an unaddressed critical CVE or hardcoded secret is detected, the security score is irrevocably capped at $\le 25$.
 
-1. Sign up at the CognoDB console (free tier, no card required).
-2. Create a new **free instance**.
-3. Copy the instance's **Bolt connection URI** (e.g.
-   `bolt+s://<instance>.cognodb…:7687`).
-4. Save the **password** shown at creation (it's displayed once). The default
-   username is `cognodb`.
+---
 
-### 2. Configure the app
+## 🏗️ Architecture & Tech Stack
 
-```bash
-git clone <your repo> && cd dependency-detective
-cp .env.example .env          # fill in COGNODB_URI / COGNODB_PASSWORD
+```
+                               ┌────────────────────────────────────────┐
+                               │           CODIT FRONTEND               │
+                               │   React 18 · Vite · Tailwind CSS       │
+                               │   Bundled Mermaid.js · Dark Cyber UI   │
+                               └──────────────────┬─────────────────────┘
+                                                  │ REST APIs
+                                                  ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   CODIT BACKEND                                        │
+│                           FastAPI · Starlette · Uvicorn                                │
+├─────────────────────────┬─────────────────────────────┬────────────────----------------┤
+│ 1. INGESTION ENGINE     │ 2. AST PARSER & GRAPH       │ 3. ML & EXPLAINABILITY ENGINE  │
+│ • GitHub API Recursive  │ • Tree-sitter Walker        │ • ONNX Runtime v1.30.0         │
+│ • Ephemeral Git Clone   │ • Iterative Stack Traversal │ • SHAP TreeExplainer           │
+│ • Pre-Extraction Guards │ • openCypher Property Graph │ • Multi-Output Defect Model    │
+└─────────────────────────┴─────────────────────────────┴────────────────────────────────┘
 ```
 
-### 3. Seed the graph
+- **Backend**: Python 3.10+, FastAPI, Starlette, Uvicorn, Tree-sitter, NetworkX, ONNX Runtime, SHAP, Scikit-learn.
+- **Frontend**: React 18, Vite, Tailwind CSS, bundled Mermaid.js, Cytoscape, Lucide icons.
+- **Graph Storage**: CognoDB (Bolt / openCypher) with offline in-memory graph fallback.
+
+---
+
+## 🚀 Quick Start
+
+### 1. Prerequisites
+- **Python**: `3.10` or newer
+- **Node.js**: `18.0` or newer (`npm`)
+
+### 2. Backend Setup
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+# Create and activate virtual environment
+python -m venv .venv
+# On Windows:
+.venv\Scripts\activate
+# On Linux/macOS:
+# source .venv/bin/activate
+
+# Install dependencies
 pip install -r backend/requirements.txt
-python database/seed.py       # wipes the instance, asks to confirm, then seeds + smoke-tests
-# python database/seed.py --dry-run   # preview dataset, touches nothing
+
+# Run backend API on :8000
+python backend/run.py
 ```
 
-The loader prints per-label counts and finishes by running the impact-analysis
-query against the freshly-seeded graph as a smoke test.
-
-### 4. Run
+### 3. Frontend Setup
 
 ```bash
-# terminal 1 — API on :8000
-cd backend && python run.py
+cd frontend
 
-# terminal 2 — UI on :5173 (proxies /api → :8000)
-cd frontend && npm install && npm run dev
+# Install packages
+npm install
+
+# Run Vite development server
+npm run dev
+
+# Or build production bundle (served directly by backend on :8000)
+npm run build
 ```
 
-Open http://localhost:5173 → search **PostgreSQL** → **Analyze impact**.
+Once running, visit **`http://localhost:8000`** (or `http://localhost:5173` if running Vite dev server).
 
-### 5. Tests
+---
 
+## 🧪 Testing & Verification
+
+### Run Backend Test Suite (Pytest)
 ```bash
-cd backend && python -m pytest tests/ -v     # 14 tests, no DB needed
+pytest -v
+# 49 passed (100% test pass rate across ingestion, AST walker, collectors, graph, report, and security)
 ```
 
-> **No CognoDB account yet?** Just run steps 4–5. With no `COGNODB_URI` the app
-> automatically serves the identical dataset from the embedded demo backend
-> (header shows “embedded demo dataset”), and the tests run against it.
+### Run End-to-End Test Suite (Playwright)
+```bash
+cd frontend
+npx playwright test
+# Tests all 5 primary routes and interactions
+```
 
 ---
 
-## Deployment
+## 📡 REST API Reference
 
-Everything needed is in [`render.yaml`](render.yaml): **Render → New →
-Blueprint** → select this repo → paste `COGNODB_URI` and `COGNODB_PASSWORD`
-when prompted. The build installs Python deps, builds the React app, and the
-single free web service serves both API and frontend (Flask serves
-`frontend/dist` directly — see `backend/app/__init__.py`).
-
-Split-hosting also works (e.g. backend on Render, frontend on Vercel): build the
-frontend with `VITE_API_BASE=https://<your-api>` set — CORS on `/api/*` is
-already open — and deploy `frontend/dist` as a static site.
-
----
-
-## Screenshots
-
-| Dashboard | Component + criticality |
-|---|---|
-| ![Dashboard](docs/screenshots/dashboard.png) | ![Component](docs/screenshots/component-postgresql.png) |
-
-| Impact analysis (multi-hop) | Path finder — "why does A depend on B?" |
-|---|---|
-| ![Impact](docs/screenshots/impact-postgresql.png) | ![Paths](docs/screenshots/path-portal-postgresql.png) |
-
-Empty state (leaf component): ![Empty](docs/screenshots/impact-empty-portal.png)
+| Endpoint | Method | Description |
+|---|:---:|---|
+| `/api/health` | `GET` | Health check, active graph backend, and node counts |
+| `/api/ingest/public` | `POST` | Ingest public GitHub repository (e.g. `https://github.com/owner/repo`) |
+| `/api/ingest/zip` | `POST` | Upload and extract ZIP archive with pre-extraction defenses |
+| `/api/ingest/private` | `POST` | Ephemeral clone using scoped read-only GitHub token |
+| `/api/analyze/run` | `POST` | Trigger full audit scan, ONNX inference, and SHAP explainability |
+| `/api/report` | `GET` | Retrieve complete canonical audit report, scores, findings, and ML metrics |
+| `/api/report/markdown` | `GET` | Export report parity as Markdown document |
+| `/api/report/html` | `GET` | Export report parity as standalone HTML / Print PDF |
+| `/api/report/diagram/impact/{id:path}` | `GET` | Generate dynamic Mermaid blast radius diagram for component |
+| `/api/components` | `GET` | Search indexed components by name or type |
+| `/api/components/{id}/impact` | `GET` | Calculate multi-hop blast radius reach and failure chains |
+| `/api/path` | `GET` | Shortest path and alternative dependency chains between two components |
 
 ---
 
-## Demo video script (2–3 min)
-
-1. Open the dashboard — point out stats + criticality leaderboard (K8s #1, PostgreSQL HIGH).
-2. Search **PostgreSQL** → direct dependents, note empty "relies on" panel.
-3. Click **Analyze impact** → narrate the multi-hop tree: 12 components, direct vs indirect columns.
-4. **Path finder**: Customer Portal → PostgreSQL → show the shortest chain, then the 4-hop alternative (Portal → Checkout → Payment → Auth → PostgreSQL).
-5. Show **PyJWT impact** — "a library CVE becomes a services blast radius" (Log4Shell argument).
-6. One breath of README → "why graph": recursive SQL vs one Cypher pattern.
-
----
-
-## Repository layout
+## 📂 Repository Structure
 
 ```
-dependency-detective/
-├── frontend/                 # React + Tailwind SPA
-│   └── src/{pages,components,api.js,router.js}
+codit/
 ├── backend/
 │   ├── app/
-│   │   ├── routes/api.py     # REST endpoints + error envelope
-│   │   ├── services/
-│   │   │   ├── cypher.py     # all parameterised openCypher
-│   │   │   ├── cognodb_graph.py   # official Neo4j driver backend
-│   │   │   ├── demo_graph.py      # embedded offline backend (same API)
-│   │   │   └── graph_service.py   # backend selection + scoring
-│   │   └── config.py
-│   ├── tests/test_api.py     # 14 tests
-│   └── run.py
-├── database/
-│   ├── seed_data.py          # canonical dataset (self-validating)
-│   ├── seed.py               # idempotent CognoDB loader + smoke test
-│   └── queries/              # the Cypher library, console-ready
-├── docs/                     # graph-model.svg/png + screenshots
-├── scripts/                  # diagram + screenshot generators
-├── .env.example · render.yaml · README.md
+│   │   ├── collectors/       # 5 audit signal collectors (security, test, etc.)
+│   │   ├── delivery/         # Models, Markdown & HTML report exporters
+│   │   ├── diagrams/         # Mermaid diagram generators
+│   │   ├── graph/            # Assembler, schema, and CognoDB/Cypher service
+│   │   ├── ingestion/        # GitHub API fetch, ZIP safe extract, Git clone
+│   │   ├── ml/               # ONNX defect scorer & SHAP explainability engine
+│   │   ├── parsers/ast/      # Iterative Tree-sitter stack walker
+│   │   ├── routes/           # FastAPI REST routers (ingest, analyze, report, api)
+│   │   └── state.py          # Unified in-memory state store
+│   ├── tests/                # 49 unit, integration, and security tests
+│   └── run.py                # Server entry point
+├── frontend/
+│   ├── src/
+│   │   ├── components/       # UI components & MermaidViewer
+│   │   ├── pages/            # AuditPage, IngestPage, Dashboard, ComponentDetail
+│   │   ├── api.js            # REST client
+│   │   └── App.jsx           # App shell, navigation & brand layout
+│   ├── tests/                # Playwright E2E test specs
+│   └── package.json
+├── database/                 # Canonical seed datasets and Cypher queries
+└── README.md
 ```
 
-## Security & scope
+---
 
-- Credentials from env vars only; `.env` git-ignored; `.env.example` committed.
-- No secrets anywhere near the frontend; read-only queries (MERGE only in `seed.py`).
-- Delivered under the 48-hour scope rule: **no** auth, no live cloud/K8s
-  integrations, no monitoring, no ML — it's an analysis and visualisation tool.
-- Depth guardrails (`*1..6` / `*1..8`) bound traversal cost on the free tier.
+## ⚖️ License
 
-## Tech stack
-
-CognoDB (Bolt/openCypher) · official Neo4j Python driver · Flask · React 18 ·
-Tailwind CSS · Vite · NetworkX (offline demo backend) · pytest
+MIT License. Developed for automated codebase audits and architectural intelligence.

@@ -9,15 +9,18 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from backend.app.delivery.pdf_export import generate_html_report, generate_markdown_report
 from backend.app.diagrams.mermaid_generator import generate_blast_radius_diagram
-from backend.app.routes.analyze import get_active_report, run_full_analysis
+from backend.app.routes.analyze import run_full_analysis
+from backend.app.state import get_active_codebase, get_active_report
 from backend.app.services import graph_service
 
 router = APIRouter(prefix="/api/report", tags=["report"])
 
 
 def _ensure_report():
+    codebase = get_active_codebase()
     report = get_active_report()
-    if report is None:
+    target = codebase.get("target")
+    if report is None or (target and target != "demo" and report.target_name != target):
         run_full_analysis()
         report = get_active_report()
     return report
@@ -52,7 +55,7 @@ def export_html_report():
     return HTMLResponse(content=content)
 
 
-@router.get("/diagram/impact/{component_id}")
+@router.get("/diagram/impact/{component_id:path}")
 def get_component_blast_radius_diagram(component_id: str):
     impact_data = graph_service.impact(component_id)
     diagram = generate_blast_radius_diagram(component_id, impact_data)

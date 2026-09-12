@@ -1,5 +1,5 @@
 {
-  "name": "dependency-detective-frontend",
+  "name": "codit-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -9,10 +9,13 @@
     "preview": "vite preview --host"
   },
   "dependencies": {
+    "mermaid": "^12.0.0",
+    "puppeteer-core": "^25.10.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",

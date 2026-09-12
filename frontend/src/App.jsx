@@ -18,8 +18,11 @@ function Logo() {
         <path d="M16 11 8.5 21M16 11l7.5 10M11 24h10" stroke="#64748b" strokeWidth="1.6" fill="none" />
       </svg>
       <div className="leading-tight">
-        <div className="text-sm font-semibold tracking-wide text-slate-50">Dependency Detective</div>
-        <div className="text-[11px] text-slate-500">Production Codebase Audit Platform</div>
+        <div className="text-base font-extrabold tracking-wider text-slate-50 flex items-center gap-2">
+          <span className="tracking-widest">CODIT</span>
+          <span className="rounded bg-sky-500/20 text-sky-400 text-[10px] font-mono px-1.5 py-0.5 border border-sky-500/30 font-semibold">v2.0</span>
+        </div>
+        <div className="text-[11px] text-slate-400">Intelligent Codebase Audit & Architecture Platform</div>
       </div>
     </a>
   )
@@ -52,6 +55,28 @@ function ModePill() {
     >
       <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
       {label}
+    </span>
+  )
+}
+
+function CodebaseTargetPill() {
+  const { data } = useFetch(() => api.ingestStatus(), [])
+  if (!data?.active_target || data.active_target === 'demo') {
+    return (
+      <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/80 px-2.5 py-1 text-[11px] font-mono text-slate-400">
+        <span className="text-slate-500">Target:</span> Demo Codebase
+      </span>
+    )
+  }
+  const cleanTarget = data.active_target.replace('https://github.com/', '')
+  return (
+    <span
+      title={`Active Ingested Codebase: ${data.active_target} (${data.file_count} files)`}
+      className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-950/40 px-2.5 py-1 text-[11px] font-mono text-sky-300 shadow-sm shadow-sky-500/10"
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-pulse" />
+      <span className="text-sky-400/70">Target:</span> {cleanTarget}
+      <span className="rounded bg-sky-900/60 px-1 py-0.2 text-[9px] text-sky-200">{data.file_count} files</span>
     </span>
   )
 }
@@ -132,6 +157,7 @@ export default function App() {
               Path Finder
             </a>
             <span className="mx-2 hidden h-4 w-px bg-slate-800 sm:block" />
+            <CodebaseTargetPill />
             <ModePill />
           </nav>
         </div>
@@ -141,7 +167,7 @@ export default function App() {
 
       <footer className="border-t border-slate-800/80 py-6">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 text-xs text-slate-500 sm:px-6">
-          <span>Codebase Audit Platform · Extending Dependency Detective</span>
+          <span>CODIT · Intelligent Codebase Audit & Architecture Intelligence Platform</span>
           <span className="font-mono text-[11px] text-slate-600">FastAPI · Neo4j / CognoDB Bolt · Tree-sitter · Claude Roadmap</span>
         </div>
       </footer>

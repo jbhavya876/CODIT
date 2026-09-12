@@ -29,6 +29,7 @@ class AuditReport:
     criticality_leaderboard: List[Dict[str, Any]]
     stats: Dict[str, Any]
     source_deleted: bool = False
+    ml_insights: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -57,4 +58,5 @@ class AuditReport:
             "criticality_leaderboard": self.criticality_leaderboard,
             "stats": self.stats,
             "source_deleted": self.source_deleted,
+            "ml_insights": self.ml_insights,
         }

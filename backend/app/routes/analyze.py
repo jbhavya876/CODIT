@@ -24,7 +24,9 @@ from backend.app.graph.assembler import assemble_graph, load_and_activate_graph
 from backend.app.ingestion.zip_extract import purge_extracted_files
 from backend.app.parsers.ast.treesitter_walker import parse_codebase_ast
 from backend.app.parsers.manifest import extract_manifests_and_signals
-from backend.app.routes.ingest import get_active_codebase
+from backend.app.state import get_active_codebase, get_active_report, set_active_report
+from backend.app.ml.onnx_scorer import run_onnx_inference
+from backend.app.ml.explainability import compute_shap_score_attributions
 from backend.app.scoring.roadmap_synthesis import generate_audit_roadmap
 from backend.app.scoring.rules_engine import score_audit
 from backend.app.services import graph_service
@@ -32,12 +34,6 @@ from backend.app.services import graph_service
 log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/analyze", tags=["analyze"])
-
-_ACTIVE_REPORT: Optional[AuditReport] = None
-
-
-def get_active_report() -> Optional[AuditReport]:
-    return _ACTIVE_REPORT
 
 
 class AnalyzeRequest(BaseModel):
@@ -98,15 +94,25 @@ def run_full_analysis(payload: AnalyzeRequest = AnalyzeRequest()):
     }
     access_tier = tier_map.get(target_type, "free_public")
 
-    # 10. Check Constraint 7: Immediate deletion of ZIP-uploaded source code
+    # 10. Run Explainable AI (SHAP) and ONNX Defect / Fragility Inference
+    graph_stats = graph_service.stats()
+    onnx_metrics = run_onnx_inference(entries, findings, graph_stats)
+    shap_explainability = compute_shap_score_attributions(scorecard, findings, entries, graph_stats)
+    ml_insights = {
+        "onnx_metrics": onnx_metrics,
+        "shap_explainability": shap_explainability,
+    }
+
+    # 11. Check Constraint 7: Immediate deletion of ZIP-uploaded source code
     source_deleted = False
     temp_dir = codebase.get("temp_dir")
-    if target_type == "zip" and temp_dir and Path(temp_dir).exists():
-        purge_extracted_files(Path(temp_dir))
+    if target_type == "zip":
+        if temp_dir and Path(temp_dir).exists():
+            purge_extracted_files(Path(temp_dir))
+            log.info("Constraint 7 enforced: Purged ZIP source files from %s post-analysis", temp_dir)
         source_deleted = True
-        log.info("Constraint 7 enforced: Purged ZIP source files from %s post-analysis", temp_dir)
 
-    # 11. Compile canonical AuditReport
+    # 12. Compile canonical AuditReport
     report = AuditReport(
         report_id=f"audit-{uuid.uuid4().hex[:8]}",
         target_name=target_name,
@@ -118,11 +124,12 @@ def run_full_analysis(payload: AnalyzeRequest = AnalyzeRequest()):
         roadmap=roadmap,
         architecture_diagram_mermaid=arch_diagram,
         criticality_leaderboard=leaderboard,
-        stats=graph_service.stats(),
+        stats=graph_stats,
         source_deleted=source_deleted,
+        ml_insights=ml_insights,
     )
 
-    _ACTIVE_REPORT = report
+    set_active_report(report)
     return {
         "status": "ok",
         "report_id": report.report_id,
@@ -130,4 +137,6 @@ def run_full_analysis(payload: AnalyzeRequest = AnalyzeRequest()):
         "phase": scorecard.phase,
         "findings_count": len(findings),
         "source_deleted": source_deleted,
+        "onnx_fragility": onnx_metrics.get("fragility_score"),
+        "shap_baseline": shap_explainability.get("baseline_score"),
     }

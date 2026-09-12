@@ -7,6 +7,7 @@ Resolves relative and internal imports against the repository file manifest.
 
 from __future__ import annotations
 
+import bisect
 import logging
 import os
 from dataclasses import dataclass, field
@@ -115,7 +116,7 @@ def resolve_import_path(
 
 
 def _extract_python_ast(code_bytes: bytes, file_path: str, known_paths: Set[str]) -> FileAstSummary:
-    """Extracts imports, definitions, and calls from Python using tree-sitter."""
+    """Extracts imports, definitions, and calls from Python using tree-sitter safely."""
     parser = get_parser("python")
     summary = FileAstSummary(path=file_path, language="python")
     if not parser:
@@ -127,54 +128,62 @@ def _extract_python_ast(code_bytes: bytes, file_path: str, known_paths: Set[str]
         log.warning("Tree-sitter parse error for %s: %s", file_path, exc)
         return summary
 
-    cursor = tree.walk()
+    # Precompute newline positions for O(log N) line lookup from byte offset
+    line_starts = [0] + [i + 1 for i, b in enumerate(code_bytes) if b == 10]
 
-    def visit(node):
+    def line_at(sb: int) -> int:
+        return bisect.bisect_right(line_starts, sb)
+
+    def txt(n) -> str:
+        return code_bytes[n.start_byte:n.end_byte].decode("utf-8", errors="replace")
+
+    stack = [tree.root_node]
+    while stack:
+        node = stack.pop()
+        ntype = node.type
+
         # 1. import statement: import x, import x.y.z as foo
-        if node.type == "import_statement":
+        if ntype == "import_statement":
             for child in node.children:
                 if child.type == "dotted_name":
-                    source = child.text.decode("utf-8")
+                    source = txt(child)
                     resolved = resolve_import_path(source, file_path, known_paths, "python")
                     summary.imports.append(ImportStatement(
                         source=source,
                         resolved_path=resolved,
                         imported_symbols=[source],
                         is_relative=source.startswith("."),
-                        line=node.start_point.row + 1,
+                        line=line_at(node.start_byte),
                     ))
                 elif child.type == "aliased_import":
                     dname = child.child_by_field_name("name")
                     if dname:
-                        source = dname.text.decode("utf-8")
+                        source = txt(dname)
                         resolved = resolve_import_path(source, file_path, known_paths, "python")
                         summary.imports.append(ImportStatement(
                             source=source,
                             resolved_path=resolved,
                             imported_symbols=[source],
                             is_relative=source.startswith("."),
-                            line=node.start_point.row + 1,
+                            line=line_at(node.start_byte),
                         ))
 
         # 2. import from statement: from x.y import a, b
-        elif node.type == "import_from_statement":
+        elif ntype == "import_from_statement":
             module_name_node = node.child_by_field_name("module_name")
             rel_prefix = ""
-            # Count relative dots if present
             for child in node.children:
                 if child.type == "relative_import":
-                    rel_prefix = child.text.decode("utf-8")
+                    rel_prefix = txt(child)
                     break
 
-            mod_name = module_name_node.text.decode("utf-8") if module_name_node else ""
+            mod_name = txt(module_name_node) if module_name_node else ""
             full_source = rel_prefix + mod_name
 
             symbols = []
             for child in node.children:
-                if child.type == "dotted_name" and child != module_name_node:
-                    symbols.append(child.text.decode("utf-8"))
-                elif child.type == "identifier" and child != module_name_node:
-                    symbols.append(child.text.decode("utf-8"))
+                if child.type in ("dotted_name", "identifier") and child != module_name_node:
+                    symbols.append(txt(child))
 
             resolved = resolve_import_path(full_source, file_path, known_paths, "python")
             summary.imports.append(ImportStatement(
@@ -182,46 +191,44 @@ def _extract_python_ast(code_bytes: bytes, file_path: str, known_paths: Set[str]
                 resolved_path=resolved,
                 imported_symbols=symbols,
                 is_relative=full_source.startswith("."),
-                line=node.start_point.row + 1,
+                line=line_at(node.start_byte),
             ))
 
         # 3. definitions: function and class definitions
-        elif node.type == "function_definition":
+        elif ntype == "function_definition":
             name_node = node.child_by_field_name("name")
             if name_node:
                 summary.defines.append(DefinitionItem(
-                    name=name_node.text.decode("utf-8"),
+                    name=txt(name_node),
                     kind="function",
-                    line=node.start_point.row + 1,
+                    line=line_at(node.start_byte),
                 ))
 
-        elif node.type == "class_definition":
+        elif ntype == "class_definition":
             name_node = node.child_by_field_name("name")
             if name_node:
                 summary.defines.append(DefinitionItem(
-                    name=name_node.text.decode("utf-8"),
+                    name=txt(name_node),
                     kind="class",
-                    line=node.start_point.row + 1,
+                    line=line_at(node.start_byte),
                 ))
 
         # 4. calls: function or method invocations
-        elif node.type == "call":
+        elif ntype == "call":
             func_node = node.child_by_field_name("function")
             if func_node:
                 summary.calls.append(CallItem(
-                    callee=func_node.text.decode("utf-8"),
-                    line=node.start_point.row + 1,
+                    callee=txt(func_node)[:60],
+                    line=line_at(node.start_byte),
                 ))
 
-        for child in node.children:
-            visit(child)
+        stack.extend(reversed(node.children))
 
-    visit(tree.root_node)
     return summary
 
 
 def _extract_js_ts_ast(code_bytes: bytes, file_path: str, known_paths: Set[str], language: str) -> FileAstSummary:
-    """Extracts imports, definitions, and calls from JS/TS using tree-sitter."""
+    """Extracts imports, definitions, and calls from JS/TS using tree-sitter safely."""
     parser = get_parser(language)
     summary = FileAstSummary(path=file_path, language=language)
     if not parser:
@@ -233,81 +240,92 @@ def _extract_js_ts_ast(code_bytes: bytes, file_path: str, known_paths: Set[str],
         log.warning("Tree-sitter parse error for %s: %s", file_path, exc)
         return summary
 
-    def visit(node):
+    # Precompute newline positions for O(log N) line lookup from byte offset
+    line_starts = [0] + [i + 1 for i, b in enumerate(code_bytes) if b == 10]
+
+    def line_at(sb: int) -> int:
+        return bisect.bisect_right(line_starts, sb)
+
+    def txt(n) -> str:
+        return code_bytes[n.start_byte:n.end_byte].decode("utf-8", errors="replace")
+
+    stack = [tree.root_node]
+    while stack:
+        node = stack.pop()
+        ntype = node.type
+
         # 1. ES module import: import { a, b } from './c'
-        if node.type == "import_statement":
+        if ntype == "import_statement":
             source_node = node.child_by_field_name("source")
             if source_node:
-                raw_src = source_node.text.decode("utf-8").strip("'\"`")
+                raw_src = txt(source_node).strip("'\"`")
                 resolved = resolve_import_path(raw_src, file_path, known_paths, language)
                 symbols = []
                 clause = node.child_by_field_name("clause") or node
                 for child in clause.children:
                     if child.type in ("import_specifier", "identifier"):
-                        symbols.append(child.text.decode("utf-8"))
+                        symbols.append(txt(child))
                 summary.imports.append(ImportStatement(
                     source=raw_src,
                     resolved_path=resolved,
                     imported_symbols=symbols,
                     is_relative=raw_src.startswith("."),
-                    line=node.start_point.row + 1,
+                    line=line_at(node.start_byte),
                 ))
 
         # 2. CommonJS require: const x = require('./x')
-        elif node.type == "call_expression":
+        elif ntype == "call_expression":
             func_node = node.child_by_field_name("function")
             args_node = node.child_by_field_name("arguments")
-            if func_node and func_node.text.decode("utf-8") == "require" and args_node:
+            if func_node and txt(func_node) == "require" and args_node:
                 if args_node.children and len(args_node.children) >= 2:
-                    arg_text = args_node.children[1].text.decode("utf-8").strip("'\"`")
+                    arg_text = txt(args_node.children[1]).strip("'\"`")
                     resolved = resolve_import_path(arg_text, file_path, known_paths, language)
                     summary.imports.append(ImportStatement(
                         source=arg_text,
                         resolved_path=resolved,
                         imported_symbols=["default"],
                         is_relative=arg_text.startswith("."),
-                        line=node.start_point.row + 1,
+                        line=line_at(node.start_byte),
                     ))
             elif func_node:
                 summary.calls.append(CallItem(
-                    callee=func_node.text.decode("utf-8"),
-                    line=node.start_point.row + 1,
+                    callee=txt(func_node)[:60],
+                    line=line_at(node.start_byte),
                 ))
 
         # 3. definitions: function and class declarations
-        elif node.type in ("function_declaration", "method_definition"):
+        elif ntype in ("function_declaration", "method_definition"):
             name_node = node.child_by_field_name("name")
             if name_node:
                 summary.defines.append(DefinitionItem(
-                    name=name_node.text.decode("utf-8"),
+                    name=txt(name_node),
                     kind="function",
-                    line=node.start_point.row + 1,
+                    line=line_at(node.start_byte),
                 ))
 
-        elif node.type == "class_declaration":
+        elif ntype == "class_declaration":
             name_node = node.child_by_field_name("name")
             if name_node:
                 summary.defines.append(DefinitionItem(
-                    name=name_node.text.decode("utf-8"),
+                    name=txt(name_node),
                     kind="class",
-                    line=node.start_point.row + 1,
+                    line=line_at(node.start_byte),
                 ))
 
         # Arrow function assignments: const handleClick = () => {}
-        elif node.type == "variable_declarator":
+        elif ntype == "variable_declarator":
             val_node = node.child_by_field_name("value")
             name_node = node.child_by_field_name("name")
             if val_node and val_node.type in ("arrow_function", "function_expression") and name_node:
                 summary.defines.append(DefinitionItem(
-                    name=name_node.text.decode("utf-8"),
+                    name=txt(name_node),
                     kind="function",
-                    line=node.start_point.row + 1,
+                    line=line_at(node.start_byte),
                 ))
 
-        for child in node.children:
-            visit(child)
+        stack.extend(reversed(node.children))
 
-    visit(tree.root_node)
     return summary
 
 

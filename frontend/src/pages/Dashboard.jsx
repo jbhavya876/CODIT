@@ -79,19 +79,28 @@ function SearchBox() {
 
 const PLURALS = {
   Service: 'Services',
+  Module: 'Modules',
   Database: 'Databases',
   API: 'APIs',
   Library: 'Libraries',
   Infrastructure: 'Infra',
+  Finding: 'Findings',
+  Team: 'Teams',
 }
 
 function StatCards({ stats, activeType, onTypeClick }) {
   const relTotal = Object.values(stats?.relationships || {}).reduce((a, b) => a + b, 0)
+  const availableTypes = useMemo(() => {
+    const keys = Object.keys(stats?.nodes || {}).filter((k) => k !== 'Team')
+    return keys.length > 0 ? keys : TYPES
+  }, [stats])
+
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-      {TYPES.map((type) => {
+      {availableTypes.map((type) => {
         const count = stats?.nodes?.[type] ?? '–'
         const active = activeType === type
+        const plural = PLURALS[type] || `${type}s`
         return (
           <button
             key={type}
@@ -99,10 +108,10 @@ function StatCards({ stats, activeType, onTypeClick }) {
             className={`rounded-xl border px-4 py-3.5 text-left transition ${
               active ? 'border-sky-500/60 bg-slate-800/80' : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
             }`}
-            title={`Filter the browser to ${PLURALS[type].toLowerCase()}`}
+            title={`Filter the browser to ${plural.toLowerCase()}`}
           >
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-slate-400">
-              <Dot type={type} /> {PLURALS[type]}
+              <Dot type={type} /> {plural}
             </div>
             <div className="mt-1.5 text-2xl font-semibold text-slate-100">{count}</div>
           </button>
@@ -191,6 +200,14 @@ function Browser({ type }) {
 export default function Dashboard() {
   const [type, setType] = useState('')
   const { data: stats, loading, error, refetch } = useFetch(() => api.stats(), [])
+  const { data: leaderboardData } = useFetch(() => api.leaderboard(6), [])
+
+  const popularItems = useMemo(() => {
+    if (leaderboardData && leaderboardData.length > 0) {
+      return leaderboardData.map((l) => [l.component.id, l.component.name || l.component.id])
+    }
+    return POPULAR
+  }, [leaderboardData])
 
   return (
     <div className="space-y-6">
@@ -205,12 +222,12 @@ export default function Dashboard() {
       <SearchBox />
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-slate-500">Popular:</span>
-        {POPULAR.map(([id, name]) => (
+        <span className="text-slate-500">Quick Inspect:</span>
+        {popularItems.map(([id, name]) => (
           <a
             key={id}
             href={href.component(id)}
-            className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs text-slate-300 transition hover:border-sky-500/60 hover:text-sky-300"
+            className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs text-slate-300 transition hover:border-sky-500/60 hover:text-sky-300 font-mono"
           >
             {name}
           </a>

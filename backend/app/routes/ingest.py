@@ -18,52 +18,9 @@ from backend.app.ingestion.github_fetch import fetch_public_repo, GitHubIngestio
 from backend.app.ingestion.git_clone import clone_private_repo, GitCloneError
 from backend.app.ingestion.models import FileEntry
 from backend.app.ingestion.zip_extract import extract_zip, purge_extracted_files, ZipSecurityError
+from backend.app.state import get_active_codebase, set_active_codebase
 
 router = APIRouter(prefix="/api/ingest", tags=["ingestion"])
-
-# Ephemeral storage of current active codebase manifest in memory
-_ACTIVE_CODEBASE: Dict[str, Any] = {
-    "target": "demo",
-    "type": "demo",
-    "entries": [],
-    "languages": {},
-    "timestamp": 0,
-    "temp_dir": None,
-}
-
-
-def get_active_codebase() -> Dict[str, Any]:
-    return _ACTIVE_CODEBASE
-
-
-def set_active_codebase(
-    target: str,
-    target_type: str,
-    entries: List[FileEntry],
-    temp_dir: Optional[Path] = None,
-) -> Dict[str, Any]:
-    global _ACTIVE_CODEBASE
-
-    # Purge previous temp_dir if was a ZIP upload
-    if _ACTIVE_CODEBASE.get("temp_dir") and Path(_ACTIVE_CODEBASE["temp_dir"]).exists():
-        purge_extracted_files(Path(_ACTIVE_CODEBASE["temp_dir"]))
-
-    lang_counts: Dict[str, int] = {}
-    total_bytes = 0
-    for e in entries:
-        lang_counts[e.language] = lang_counts.get(e.language, 0) + 1
-        total_bytes += e.size
-
-    _ACTIVE_CODEBASE = {
-        "target": target,
-        "type": target_type,
-        "entries": entries,
-        "languages": lang_counts,
-        "file_count": len(entries),
-        "total_size_kb": round(total_bytes / 1024, 1),
-        "temp_dir": str(temp_dir) if temp_dir else None,
-    }
-    return _ACTIVE_CODEBASE
 
 
 class PublicRepoRequest(BaseModel):

@@ -12,10 +12,10 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .config import Config
-from .routes.api import router as core_api_router, ApiError
-from .services import graph_service
-from .services.graph_service import DatabaseUnavailable
+from backend.app.config import Config
+from backend.app.routes.api import router as core_api_router, ApiError
+from backend.app.services import graph_service
+from backend.app.services.graph_service import DatabaseUnavailable
 
 log = logging.getLogger(__name__)
 
@@ -103,19 +103,19 @@ def create_app(config_overrides: dict[str, Any] | None = None) -> FastAPI:
 
     # Try registering additional route modules if available
     try:
-        from .routes.ingest import router as ingest_router
+        from backend.app.routes.ingest import router as ingest_router
         app.include_router(ingest_router)
     except ImportError:
         pass
 
     try:
-        from .routes.analyze import router as analyze_router
+        from backend.app.routes.analyze import router as analyze_router
         app.include_router(analyze_router)
     except ImportError:
         pass
 
     try:
-        from .routes.report import router as report_router
+        from backend.app.routes.report import router as report_router
         app.include_router(report_router)
     except ImportError:
         pass

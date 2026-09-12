@@ -19,3 +19,11 @@ dist/
 .DS_Store
 .idea/
 .vscode/
+
+# testing & reports
+test-results/
+playwright-report/
+blob-report/
+.cache/
+*.log
+
