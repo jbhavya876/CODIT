@@ -136,26 +136,7 @@ export default function App() {
             >
               Ingest Repo
             </a>
-            <a
-              href="#/"
-              className={`rounded-lg px-3 py-1.5 transition ${
-                route.name === 'dashboard'
-                  ? 'bg-slate-800/90 text-sky-400 font-medium'
-                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'
-              }`}
-            >
-              Graph Explorer
-            </a>
-            <a
-              href="#/path"
-              className={`rounded-lg px-3 py-1.5 transition ${
-                route.name === 'path'
-                  ? 'bg-slate-800/90 text-sky-400 font-medium'
-                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'
-              }`}
-            >
-              Path Finder
-            </a>
+
             <span className="mx-2 hidden h-4 w-px bg-slate-800 sm:block" />
             <CodebaseTargetPill />
             <ModePill />
