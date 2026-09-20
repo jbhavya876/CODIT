@@ -159,6 +159,24 @@ npm run build
 
 Open **`http://localhost:8000`** in your browser (or `http://localhost:5173` if running the Vite dev server).
 
+### Algorand MainNet x402 Payments
+
+The paid report resource is available at `GET /api/payments/report`. It uses the
+GoPlausible-compatible x402 facilitator contract (`/verify` and `/settle`) and
+defaults to Algorand MainNet with USDC ASA `31566704`. Configure the receiving
+address and facilitator URL before starting the backend:
+
+```bash
+export X402_PAY_TO="YOUR_ALGORAND_MAINNET_ADDRESS"
+export X402_FACILITATOR_URL="YOUR_GOPLAUSIBLE_FACILITATOR_URL"
+export X402_AMOUNT="1000000" # 1 USDC, in the ASA base unit
+```
+
+`GET /api/payments/requirements` returns the x402 challenge. A client sends its
+Pera-signed transaction group as the base64-encoded JSON `PAYMENT-SIGNATURE`
+header. The backend verifies and settles it through the facilitator before
+returning the report and a `PAYMENT-RESPONSE` header.
+
 ---
 
 ## 🧪 Testing & Quality Assurance
@@ -232,4 +250,4 @@ codit/
 
 ## ⚖️ License
 
-Distributed under the **MIT License**. See `LICENSE` for more information.
+Distributed under the **MIT License**. See `LICENSE` for more information.

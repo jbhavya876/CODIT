@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PeraWalletConnect } from '@perawallet/connect'
 
-const configuredChainId = Number(import.meta.env.VITE_ALGORAND_CHAIN_ID || 416002)
+const configuredChainId = Number(import.meta.env.VITE_ALGORAND_CHAIN_ID || 416001)
 
 // Keep one client for the lifetime of the app so Pera can restore its session.
 export const peraWallet = new PeraWalletConnect({
