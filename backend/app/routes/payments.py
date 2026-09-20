@@ -25,10 +25,14 @@ def _requirements() -> dict[str, Any]:
     return {
         "scheme": "exact",
         "network": Config.X402_NETWORK,
-        "maxAmountRequired": Config.X402_AMOUNT,
+        "amount": Config.X402_AMOUNT,
         "payTo": Config.X402_PAY_TO,
         "asset": Config.X402_ASSET,
         "maxTimeoutSeconds": Config.X402_MAX_TIMEOUT_SECONDS,
+        "extra": {
+            "decimals": Config.X402_DECIMALS,
+            **({"feePayer": Config.X402_FEE_PAYER} if Config.X402_FEE_PAYER else {}),
+        },
     }
 
 
@@ -128,7 +132,13 @@ async def paid_report(
     if verification.get("isValid") is not True and verification.get("valid") is not True:
         response.status_code = 402
         response.headers["PAYMENT-REQUIRED"] = _encode_header(challenge)
-        return {"error": {"code": "payment_invalid", "message": "The facilitator rejected the payment."}, **verification}
+        return {
+            "error": {
+                "code": "payment_invalid",
+                "message": verification.get("invalidReason") or "The facilitator rejected the payment.",
+            },
+            **verification,
+        }
 
     report = _ensure_report()
     settlement = await _facilitator_call("settle", payment_payload, requirements)
@@ -138,4 +148,4 @@ async def paid_report(
         return {"error": {"code": "payment_unsettled", "message": "The facilitator could not settle the payment."}, **settlement}
 
     response.headers["PAYMENT-RESPONSE"] = _encode_header(settlement)
-    return report.to_dict()
+    return {"report": report.to_dict(), "payment": settlement}

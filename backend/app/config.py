@@ -61,3 +61,5 @@ class Config:
     X402_ASSET = os.getenv("X402_ASSET", "31566704")
     X402_AMOUNT = os.getenv("X402_AMOUNT", "1000000")
     X402_MAX_TIMEOUT_SECONDS = int(os.getenv("X402_MAX_TIMEOUT_SECONDS", "120"))
+    X402_DECIMALS = int(os.getenv("X402_DECIMALS", "6"))
+    X402_FEE_PAYER = os.getenv("X402_FEE_PAYER", "")

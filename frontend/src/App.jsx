@@ -8,6 +8,7 @@ import PathPage from './pages/Path.jsx'
 import IngestPage from './pages/IngestPage.jsx'
 import AuditPage from './pages/AuditPage.jsx'
 import { usePeraWallet } from './wallet.js'
+import X402TestnetPanel from './components/X402TestnetPanel.jsx'
 
 function Logo() {
   return (
@@ -173,7 +174,10 @@ export default function App() {
         </div>
       </header>
 
-      <main className="relative mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6">{page}</main>
+      <main className="relative mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6">
+        <X402TestnetPanel />
+        {page}
+      </main>
 
       <footer className="border-t border-slate-800/80 py-6">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 text-xs text-slate-500 sm:px-6">

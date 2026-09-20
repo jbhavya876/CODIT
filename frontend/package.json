@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@perawallet/connect": "^1.6.1",
+    "algosdk": "^3.7.0",
     "mermaid": "^12.0.0",
     "puppeteer-core": "^25.10.0",
     "react": "^18.3.1",

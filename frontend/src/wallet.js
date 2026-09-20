@@ -48,11 +48,14 @@ export function usePeraWallet() {
     try {
       const accounts = await peraWallet.connect()
       peraWallet.connector?.on('disconnect', disconnect)
-      setAccountAddress(accounts[0] || null)
+      const address = accounts[0] || null
+      setAccountAddress(address)
+      return address
     } catch (connectError) {
       if (connectError?.data?.type !== 'CONNECT_MODAL_CLOSED') {
         setError('Pera Wallet could not be connected.')
       }
+      return null
     } finally {
       setConnecting(false)
     }
@@ -62,7 +65,7 @@ export function usePeraWallet() {
     if (!accountAddress) {
       throw new Error('Connect Pera Wallet before signing a payment.')
     }
-    return peraWallet.signTransaction(transactionGroups, accountAddress)
+    return peraWallet.signTransaction(transactionGroups)
   }, [accountAddress])
 
   return {
