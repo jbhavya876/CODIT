@@ -7,6 +7,7 @@ import ImpactPage from './pages/Impact.jsx'
 import PathPage from './pages/Path.jsx'
 import IngestPage from './pages/IngestPage.jsx'
 import AuditPage from './pages/AuditPage.jsx'
+import { usePeraWallet } from './wallet.js'
 
 function Logo() {
   return (
@@ -81,6 +82,33 @@ function CodebaseTargetPill() {
   )
 }
 
+function WalletButton() {
+  const { accountAddress, chainId, connecting, connected, error, connect, disconnect } = usePeraWallet()
+  const shortAddress = accountAddress
+    ? `${accountAddress.slice(0, 5)}…${accountAddress.slice(-4)}`
+    : null
+
+  return (
+    <div className="relative hidden sm:block">
+      <button
+        type="button"
+        onClick={connected ? disconnect : connect}
+        disabled={connecting}
+        title={connected ? `Disconnect ${accountAddress}` : `Connect Pera Wallet on Algorand ${chainId}`}
+        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[11px] font-semibold transition disabled:cursor-wait disabled:opacity-60 ${
+          connected
+            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
+            : 'border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
+        }`}
+      >
+        <span className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+        {connecting ? 'Connecting…' : connected ? shortAddress : 'Connect Pera'}
+      </button>
+      {error && <span className="absolute right-0 top-full mt-2 w-52 rounded border border-rose-500/30 bg-slate-900 px-2 py-1.5 text-[10px] text-rose-300 shadow-xl">{error}</span>}
+    </div>
+  )
+}
+
 export default function App() {
   const hash = useHashRoute()
   const route = parseRoute(hash)
@@ -140,6 +168,7 @@ export default function App() {
             <span className="mx-2 hidden h-4 w-px bg-slate-800 sm:block" />
             <CodebaseTargetPill />
             <ModePill />
+            <WalletButton />
           </nav>
         </div>
       </header>
