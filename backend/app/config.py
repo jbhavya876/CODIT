@@ -50,3 +50,17 @@ class Config:
 
     # Data Retention & Cleanup
     REPORT_RETENTION_HOURS = int(os.getenv("REPORT_RETENTION_HOURS", "24"))
+
+    # x402 Algorand MainNet payment configuration.
+    X402_FACILITATOR_URL = os.getenv("X402_FACILITATOR_URL", "").rstrip("/")
+    X402_NETWORK = os.getenv(
+        "X402_NETWORK",
+        "algorand:wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=",
+    )
+    X402_PAY_TO = os.getenv("X402_PAY_TO", "")
+    X402_ASSET = os.getenv("X402_ASSET", "31566704")
+    X402_AMOUNT = os.getenv("X402_AMOUNT", "1000000")
+    X402_MAX_TIMEOUT_SECONDS = int(os.getenv("X402_MAX_TIMEOUT_SECONDS", "120"))
+    X402_DECIMALS = int(os.getenv("X402_DECIMALS", "6"))
+    X402_FEE_PAYER = os.getenv("X402_FEE_PAYER", "")
+    X402_RESOURCE_URL = os.getenv("X402_RESOURCE_URL", "")

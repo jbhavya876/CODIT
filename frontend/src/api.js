@@ -82,6 +82,15 @@ export const api = {
   getBlastRadiusDiagram: (id) => request(`/report/diagram/impact/${encodeURIComponent(id)}`),
   getMarkdownReportUrl: () => `${API_BASE}/api/report/markdown`,
   getHtmlReportUrl: () => `${API_BASE}/api/report/html`,
+
+  // x402 Algorand payment flow. The server returns PAYMENT-REQUIRED on 402;
+  // the caller signs its payment group with usePeraWallet().signTransactions.
+  paymentRequirements: () => request('/payments/requirements'),
+  paidReport: (paymentSignature) => request('/payments/report', {
+    headers: {
+      'PAYMENT-SIGNATURE': paymentSignature,
+    },
+  }),
 }
 
 export function useFetch(fn, deps = []) {

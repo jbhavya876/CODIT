@@ -120,6 +120,12 @@ def create_app(config_overrides: dict[str, Any] | None = None) -> FastAPI:
     except ImportError:
         pass
 
+    try:
+        from backend.app.routes.payments import router as payments_router
+        app.include_router(payments_router)
+    except ImportError:
+        pass
+
     # Static file serving & SPA fallback
     if FRONTEND_DIST.is_dir():
         app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
