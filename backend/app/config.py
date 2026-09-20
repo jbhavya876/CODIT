@@ -63,3 +63,4 @@ class Config:
     X402_MAX_TIMEOUT_SECONDS = int(os.getenv("X402_MAX_TIMEOUT_SECONDS", "120"))
     X402_DECIMALS = int(os.getenv("X402_DECIMALS", "6"))
     X402_FEE_PAYER = os.getenv("X402_FEE_PAYER", "")
+    X402_RESOURCE_URL = os.getenv("X402_RESOURCE_URL", "")

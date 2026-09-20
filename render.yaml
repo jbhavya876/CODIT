@@ -38,3 +38,21 @@ services:
         value: "120"
       - key: REPORT_RETENTION_HOURS
         value: "24"
+      - key: X402_FACILITATOR_URL
+        value: https://facilitator.goplausible.xyz
+      - key: X402_NETWORK
+        value: algorand:wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=
+      - key: X402_ASSET
+        value: "31566704"
+      - key: X402_AMOUNT
+        value: "150000"
+      - key: X402_DECIMALS
+        value: "6"
+      - key: X402_MAX_TIMEOUT_SECONDS
+        value: "120"
+      - key: X402_PAY_TO
+        sync: false
+      - key: X402_FEE_PAYER
+        sync: false
+      - key: X402_RESOURCE_URL
+        sync: false

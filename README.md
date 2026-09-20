@@ -169,7 +169,7 @@ address and facilitator URL before starting the backend:
 ```bash
 export X402_PAY_TO="YOUR_ALGORAND_MAINNET_ADDRESS"
 export X402_FACILITATOR_URL="YOUR_GOPLAUSIBLE_FACILITATOR_URL"
-export X402_AMOUNT="1000000" # 1 USDC, in the ASA base unit
+export X402_AMOUNT="150000" # 0.15 USDC, in the ASA base unit
 ```
 
 `GET /api/payments/requirements` returns the x402 challenge. A client sends its
@@ -246,6 +246,11 @@ codit/
 └── README.md
 ```
 
+---
+
+## ⚖️ License
+
+Distributed under the **MIT License**. See `LICENSE` for more information.
 ---
 
 ## ⚖️ License

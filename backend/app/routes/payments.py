@@ -37,11 +37,12 @@ def _requirements() -> dict[str, Any]:
 
 
 def _payment_required() -> dict[str, Any]:
+    resource_url = Config.X402_RESOURCE_URL or "/api/payments/report"
     return {
         "x402Version": 2,
         "accepts": [_requirements()],
         "resource": {
-            "url": "/api/payments/report",
+            "url": resource_url,
             "description": "CODIT audit report",
             "mimeType": "application/json",
         },

@@ -47,7 +47,7 @@ export default function X402TestnetPanel() {
         throw new Error(`Backend is not configured for Algorand ${networkConfig.label}.`)
       }
 
-      const algod = new algosdk.Algodv2('', TESTNET_ALGOD, '')
+      const algod = new algosdk.Algodv2('', ALGORAND_ALGOD, '')
       const suggestedParams = await algod.getTransactionParams().do()
       const transaction = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
         sender: accountAddress,
@@ -96,7 +96,7 @@ export default function X402TestnetPanel() {
           disabled={busy}
           className="rounded-lg bg-amber-400 px-4 py-2 text-xs font-bold text-slate-950 transition hover:bg-amber-300 disabled:cursor-wait disabled:opacity-60"
         >
-          {busy ? 'Waiting for Pera…' : wallet.connected ? `Pay 1 USDC ${networkConfig.label}` : `Connect & Pay ${networkConfig.label}`}
+          {busy ? 'Waiting for Pera…' : wallet.connected ? `Pay 0.15 USDC ${networkConfig.label}` : `Connect & Pay ${networkConfig.label}`}
         </button>
       </div>
       {status && <p className={`mt-3 text-xs ${paidReport ? 'text-emerald-300' : 'text-amber-200'}`}>{status}</p>}
