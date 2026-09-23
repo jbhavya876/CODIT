@@ -48,12 +48,22 @@ def ingestion_status():
 
 @router.post("/public")
 def ingest_public_repo(payload: PublicRepoRequest):
+    # Validate URL before making any network request
+    url = payload.url.strip()
+    if not url.startswith("https://github.com/"):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "invalid_url",
+                "message": "Only public GitHub repository URLs (https://github.com/...) are supported.",
+            },
+        )
     try:
-        entries = fetch_public_repo(payload.url, ref=payload.ref or "main")
-        summary = set_active_codebase(payload.url, "public", entries)
+        entries = fetch_public_repo(url, ref=payload.ref or "main")
+        summary = set_active_codebase(url, "public", entries)
         return {
             "status": "ok",
-            "message": f"Successfully ingested public repository: {payload.url}",
+            "message": f"Successfully ingested public repository: {url}",
             **summary,
         }
     except GitHubIngestionError as exc:
@@ -71,8 +81,20 @@ async def ingest_zip_upload(file: UploadFile = File(...)):
             detail={"code": "invalid_file", "message": "Only .zip archive uploads are supported."},
         )
 
-    # Read uploaded bytes
+    # Read uploaded bytes and enforce per-file size limit
     content = await file.read()
+    max_bytes = Config.MAX_INDIVIDUAL_FILE_MB * 1024 * 1024
+    if len(content) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "code": "file_too_large",
+                "message": (
+                    f"Uploaded archive exceeds the maximum allowed size of "
+                    f"{Config.MAX_INDIVIDUAL_FILE_MB} MB."
+                ),
+            },
+        )
     temp_dir = Path(tempfile.mkdtemp(prefix="audit_zip_"))
 
     try:

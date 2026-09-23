@@ -39,7 +39,12 @@ from backend.app.scoring.rules_engine import score_audit
 @pytest.fixture()
 def client():
     app = create_app({"GRAPH_BACKEND": "demo"})
-    return TestClient(app)
+    # Disable rate limiting so adversarial multi-request tests aren't throttled
+    import os
+    os.environ["RATE_LIMIT_ENABLED"] = "false"
+    client = TestClient(app)
+    yield client
+    os.environ["RATE_LIMIT_ENABLED"] = "true"
 
 
 def test_adversarial_malicious_postinstall_never_executes(client, tmp_path):

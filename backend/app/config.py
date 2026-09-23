@@ -64,3 +64,31 @@ class Config:
     X402_DECIMALS = int(os.getenv("X402_DECIMALS", "6"))
     X402_FEE_PAYER = os.getenv("X402_FEE_PAYER", "")
     X402_RESOURCE_URL = os.getenv("X402_RESOURCE_URL", "")
+
+    # ---------------------------------------------------------------------------
+    # CORS
+    # ---------------------------------------------------------------------------
+    # Comma-separated list of allowed origins. Use "*" only in development.
+    # Production: set to your actual frontend origin, e.g.
+    #   CORS_ORIGINS=https://codit.example.com
+    _cors_raw = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:4173")
+    CORS_ORIGINS: list[str] = [o.strip() for o in _cors_raw.split(",") if o.strip()]
+
+    # ---------------------------------------------------------------------------
+    # Rate Limiting  (sliding window, per IP, per route group)
+    # ---------------------------------------------------------------------------
+    RATE_LIMIT_ENABLED    = os.getenv("RATE_LIMIT_ENABLED", "true").lower() != "false"
+    RATE_LIMIT_GENERAL_RPM = int(os.getenv("RATE_LIMIT_GENERAL_RPM", "120"))  # req / 60s
+    RATE_LIMIT_INGEST_RPM  = int(os.getenv("RATE_LIMIT_INGEST_RPM",  "10"))
+    RATE_LIMIT_ANALYZE_RPM = int(os.getenv("RATE_LIMIT_ANALYZE_RPM", "4"))
+    RATE_LIMIT_REPORT_RPM  = int(os.getenv("RATE_LIMIT_REPORT_RPM",  "20"))
+
+    # ---------------------------------------------------------------------------
+    # Request Guards
+    # ---------------------------------------------------------------------------
+    # Hard ceiling on incoming request body size (before routing)
+    MAX_REQUEST_BODY_MB      = int(os.getenv("MAX_REQUEST_BODY_MB", "50"))
+    # Wall-clock timeout per request in seconds
+    REQUEST_TIMEOUT_SECONDS  = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "300"))
+    # Comma-separated hostnames; "*" disables host-header checking (dev default)
+    ALLOWED_HOSTS            = os.getenv("ALLOWED_HOSTS", "*")

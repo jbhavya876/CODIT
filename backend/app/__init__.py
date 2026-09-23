@@ -16,6 +16,9 @@ from backend.app.config import Config
 from backend.app.routes.api import router as core_api_router, ApiError
 from backend.app.services import graph_service
 from backend.app.services.graph_service import DatabaseUnavailable
+from backend.app.middleware.rate_limit import RateLimitMiddleware
+from backend.app.middleware.security_headers import SecurityHeadersMiddleware
+from backend.app.middleware.request_guard import RequestGuardMiddleware
 
 log = logging.getLogger(__name__)
 
@@ -45,14 +48,23 @@ def create_app(config_overrides: dict[str, Any] | None = None) -> FastAPI:
     # Initialize graph service backend
     graph_service.init_app(app_config)
 
-    # CORS
+    # CORS — allow only configured origins (default: localhost dev servers)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=Config.CORS_ORIGINS,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
     )
+
+    # Security headers — outermost, so every response (incl. 429/413) gets headers
+    app.add_middleware(SecurityHeadersMiddleware)
+
+    # Request guard — body size limit, timeout, host validation
+    app.add_middleware(RequestGuardMiddleware)
+
+    # Rate limiter — innermost of the security stack
+    app.add_middleware(RateLimitMiddleware)
 
     # --- Error Handlers -------------------------------------------------------
 
@@ -137,7 +149,16 @@ def create_app(config_overrides: dict[str, Any] | None = None) -> FastAPI:
                     status_code=404,
                     content={"error": {"code": "not_found", "message": "Resource not found."}},
                 )
-            candidate = FRONTEND_DIST / full_path
+            # Path traversal guard: resolve the candidate and verify it is
+            # a strict descendant of FRONTEND_DIST before serving.
+            try:
+                candidate = (FRONTEND_DIST / full_path).resolve()
+                candidate.relative_to(FRONTEND_DIST.resolve())  # raises ValueError if outside
+            except (ValueError, OSError):
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": {"code": "bad_request", "message": "Invalid path."}},
+                )
             if candidate.is_file():
                 return FileResponse(candidate)
             return FileResponse(FRONTEND_DIST / "index.html")
