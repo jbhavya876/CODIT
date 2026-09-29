@@ -91,7 +91,7 @@ The codebase graph represents architectural components as nodes and their relati
 
 ## 🧠 Explainable Machine Learning (ONNX & SHAP)
 
-CODIT integrates open-source machine learning models to eliminate subjective risk heuristics:
+CODIT encodes expert-defined risk heuristics into a calibrated, SHAP-explainable machine learning model. Rather than claiming to learn from noisy real-world post-mortems or treating risk as a black box, the model is trained on synthetic structural profiles fit to hand-authored architectural formulas. This ensures risk scoring is mathematically consistent across repositories, reproducible, and fully explainable via game-theoretic Shapley attributions:
 
 ### 1. ONNX Defect Risk Regressor (`defect_model.onnx`)
 A multi-output ensemble regression model exported to ONNX format (opset 15) and executed via `onnxruntime`. The model evaluates 10 structural features:
@@ -109,9 +109,9 @@ A multi-output ensemble regression model exported to ONNX format (opset 15) and 
 - **Defect Risk Tier** (`Low`, `Moderate`, `High`, `Critical`)
 
 ### 2. SHAP Game-Theoretic Decomposition
-Using Shapley values ($\phi_i$), CODIT explains the exact delta each architectural metric contributes to the final assessment:
+Using Shapley values ($\phi_i$), CODIT explains the exact delta each architectural metric contributes to the final assessment relative to the baseline expectation:
 $$\text{Score} = \mathbb{E}[f(X)] + \sum_{i=1}^{M} \phi_i$$
-This ensures every defect finding and score deduction is mathematically transparent and reproducible.
+This ensures every defect finding and score deduction is mathematically transparent, attributed to concrete signals, and verifiable by engineering teams.
 
 ---
 
@@ -125,7 +125,7 @@ This ensures every defect finding and score deduction is mathematically transpar
 
 ```bash
 # Clone repository
-git clone https://github.com/charmi-reddy/Dependency-Detective.git codit
+git clone https://github.com/jbhavya876/CODIT.git codit
 cd codit
 
 # Create and activate virtual environment
