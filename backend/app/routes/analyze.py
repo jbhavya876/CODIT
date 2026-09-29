@@ -69,7 +69,22 @@ def run_full_analysis(payload: AnalyzeRequest = AnalyzeRequest()):
     scorecard = score_audit(findings)
 
     # 5. Graph Assembly & activation (Module 4)
-    nodes, edges = load_and_activate_graph(entries, deps, signals, ast_map, findings)
+    if target_type == "demo" and not entries:
+        graph_service.reset_graph_to_seed()
+        from database import seed_data
+        nodes = []
+        for nid, lbl in seed_data.LABELS.items():
+            props = dict(seed_data.ALL_PROPERTIES.get(nid, {}))
+            props["id"] = nid
+            props["type"] = lbl
+            props["labels"] = lbl
+            nodes.append(props)
+        edges = [
+            {"source_id": src, "rel_type": rtype, "target_id": dst}
+            for src, rtype, dst in seed_data.RELATIONSHIPS
+        ]
+    else:
+        nodes, edges = load_and_activate_graph(entries, deps, signals, ast_map, findings)
 
     # 6. Generate Mermaid architecture diagram (Module 7)
     arch_diagram = generate_architecture_diagram(nodes, edges)

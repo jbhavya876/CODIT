@@ -30,15 +30,14 @@ _SECURITY_HEADERS = {
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "geolocation=(), camera=(), microphone=(), payment=()",
     # CSP: allow same-origin resources; inline scripts/styles needed for Vite
-    # dev builds and Mermaid rendering. Tighten further once a nonce strategy
-    # is in place.
+    # dev builds, Mermaid rendering, Google Fonts, and Algorand/Pera wallet.
     "Content-Security-Policy": (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-        "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: blob:; "
-        "font-src 'self' data:; "
-        "connect-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "img-src 'self' data: blob: https://*.perawallet.app; "
+        "font-src 'self' data: https://fonts.gstatic.com; "
+        "connect-src 'self' https://wc.perawallet.app https://*.algonode.cloud wss://*.walletconnect.com wss://*.walletconnect.org; "
         "frame-ancestors 'none'"
     ),
     # Only sent when the server is behind TLS termination

@@ -35,11 +35,9 @@ export default function AuditPage() {
 
   // Sync route inspection param if hash changes
   useEffect(() => {
-    if (route.inspectId) {
-      setInspectingComponentId(route.inspectId)
-      if (route.tab) setInspectorTab(route.tab)
-      if (route.pathTo) setInspectorPathTo(route.pathTo)
-    }
+    setInspectingComponentId(route.inspectId || null)
+    if (route.tab) setInspectorTab(route.tab)
+    if (route.pathTo) setInspectorPathTo(route.pathTo)
   }, [route.inspectId, route.tab, route.pathTo])
 
   useEffect(() => {
@@ -74,6 +72,17 @@ export default function AuditPage() {
     setInspectingComponentId(compId)
     setInspectorTab(tab)
     setInspectorPathTo(to)
+    const params = new URLSearchParams()
+    if (compId) params.set('inspect', compId)
+    if (tab && tab !== 'deps') params.set('tab', tab)
+    if (to) params.set('to', to)
+    const qs = params.toString()
+    window.location.hash = qs ? `#/audit?${qs}` : '#/audit'
+  }
+
+  const handleCloseInspector = () => {
+    setInspectingComponentId(null)
+    window.location.hash = '#/audit'
   }
 
   if (loading && !report) {
@@ -229,6 +238,7 @@ export default function AuditPage() {
           {/* Additive On-Chain Verification Option */}
           <button
             onClick={() => setShowX402Modal(true)}
+            data-testid="onchain-proof-btn"
             className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3.5 py-1.5 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 transition flex items-center gap-1.5"
             title="Settle report on Algorand blockchain via x402 protocol"
           >
@@ -686,6 +696,7 @@ export default function AuditPage() {
             return (
               <div
                 key={compId}
+                data-testid="leaderboard-card"
                 onClick={() => openInspector(compId, 'deps')}
                 className="group rounded-xl border border-slate-800 bg-slate-950/60 p-3.5 space-y-2 cursor-pointer transition hover:border-sky-500/60 hover:bg-slate-900"
               >
@@ -790,7 +801,7 @@ export default function AuditPage() {
           componentId={inspectingComponentId}
           initialTab={inspectorTab}
           initialPathTo={inspectorPathTo}
-          onClose={() => setInspectingComponentId(null)}
+          onClose={handleCloseInspector}
         />
       )}
 

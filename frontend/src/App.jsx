@@ -144,6 +144,7 @@ export default function App() {
             
             <button
               onClick={() => setShowX402Modal(true)}
+              data-testid="x402-settle-btn"
               className={`hidden sm:inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-mono font-semibold transition ${
                 wallet.connected
                   ? 'border-emerald-500/40 bg-emerald-950/20 text-emerald-300 hover:bg-emerald-950/40'

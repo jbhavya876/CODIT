@@ -27,6 +27,16 @@ export default function GraphPathInspector({ componentId, initialTab = 'deps', i
     }
   }, [initialPathTo, currentId])
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && onClose) {
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
   // Fetch component dependencies & details
   const { data: depData, loading: depLoading, error: depError } = useFetch(
     () => (currentId ? api.dependencies(currentId) : Promise.resolve(null)),
@@ -80,50 +90,62 @@ export default function GraphPathInspector({ componentId, initialTab = 'deps', i
   const dependents = depData?.dependents || []
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col border-l border-slate-800 bg-[#0c1220]/95 shadow-2xl backdrop-blur-xl">
-      {/* Drawer Header */}
-      <div className="border-b border-slate-800/80 p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Dot type={compType} />
-              <h2 className="truncate text-lg font-bold text-slate-100" title={record.name || currentId}>
-                {record.name || currentId}
-              </h2>
-              <TypeBadge type={compType} />
-              {record.status && <StatusPill status={record.status} />}
-              {critData?.tier && <CritBadge tier={critData.tier} />}
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity"
+        onClick={onClose}
+        data-testid="inspector-backdrop"
+        aria-hidden="true"
+      />
+
+      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col border-l border-slate-800 bg-[#0c1220]/95 shadow-2xl backdrop-blur-xl">
+        {/* Drawer Header */}
+        <div className="border-b border-slate-800/80 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Dot type={compType} />
+                <h2 className="truncate text-lg font-bold text-slate-100" title={record.name || currentId}>
+                  {record.name || currentId}
+                </h2>
+                <TypeBadge type={compType} />
+                {record.status && <StatusPill status={record.status} />}
+                {critData?.tier && <CritBadge tier={critData.tier} />}
+              </div>
+
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-mono text-slate-400">
+                <span className="truncate max-w-md bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-slate-300">
+                  {currentId}
+                </span>
+                <button
+                  onClick={handleCopyId}
+                  className="text-[11px] text-sky-400 hover:text-sky-300 font-mono transition"
+                >
+                  {copied ? '✓ Copied' : '📋 Copy ID'}
+                </button>
+                {record.owner && <span className="text-slate-500">· owner: {record.owner}</span>}
+                {record.language && <span className="text-slate-500">· {record.language}</span>}
+              </div>
             </div>
 
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-mono text-slate-400">
-              <span className="truncate max-w-md bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-slate-300">
-                {currentId}
-              </span>
-              <button
-                onClick={handleCopyId}
-                className="text-[11px] text-sky-400 hover:text-sky-300 font-mono transition"
-              >
-                {copied ? '✓ Copied' : '📋 Copy ID'}
-              </button>
-              {record.owner && <span className="text-slate-500">· owner: {record.owner}</span>}
-              {record.language && <span className="text-slate-500">· {record.language}</span>}
-            </div>
+            <button
+              onClick={onClose}
+              data-testid="close-inspector"
+              className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition"
+              title="Close Inspector"
+              aria-label="Close Inspector"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
           </div>
-
-          <button
-            onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition"
-            title="Close Inspector"
-          >
-            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
-        </div>
 
         {/* Navigation Tabs */}
         <div className="mt-4 flex gap-1 rounded-lg border border-slate-800 bg-slate-950 p-1">
           <button
+            data-testid="inspector-tab-deps"
             onClick={() => setTab('deps')}
             className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition ${
               tab === 'deps'
@@ -134,6 +156,7 @@ export default function GraphPathInspector({ componentId, initialTab = 'deps', i
             Neighborhood ({dependencies.length + dependents.length})
           </button>
           <button
+            data-testid="inspector-tab-blast"
             onClick={() => setTab('blast')}
             className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition ${
               tab === 'blast'
@@ -144,6 +167,7 @@ export default function GraphPathInspector({ componentId, initialTab = 'deps', i
             Blast Radius ({critData?.total ?? 0})
           </button>
           <button
+            data-testid="inspector-tab-path"
             onClick={() => setTab('path')}
             className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition ${
               tab === 'path'
@@ -416,5 +440,6 @@ export default function GraphPathInspector({ componentId, initialTab = 'deps', i
         )}
       </div>
     </div>
-  )
+  </>
+)
 }
