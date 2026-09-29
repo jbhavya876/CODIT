@@ -27,6 +27,9 @@ export function parseRoute(hash) {
   if (parts[0] === 'ingest') {
     return { name: 'ingest' }
   }
+  if (parts[0] === 'design-system') {
+    return { name: 'design-system' }
+  }
   // Legacy deep-links seamlessly fold into Audit Cockpit inspection
   if (parts[0] === 'c' && parts[1]) {
     return {
