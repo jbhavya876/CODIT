@@ -7,50 +7,70 @@
 }
 
 body {
-  @apply bg-[#060911] text-slate-200 antialiased selection:bg-sky-500/30 selection:text-sky-200;
+  @apply bg-[#080B11] text-slate-200 antialiased selection:bg-sky-500/30 selection:text-sky-200;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
-/* Tabular figures for telemetry metrics */
+/* Accessible focus visible rings across interactive elements */
+:focus-visible {
+  outline: 2px solid #38BDF8;
+  outline-offset: 2px;
+}
+
+/* Reduced motion preference compliance */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Tabular figures for telemetry metrics and audit data */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
 
-/* Precision scrollbar */
+/* Precision instrument scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 9999px;
+  background: #1A2438;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #2A3B57;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #080B11;
 }
 
+/* Subtle telemetry status blink */
 @keyframes codit-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.96); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }
 
 .animate-telemetry {
   animation: codit-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Glass & Glow utilities */
-.glass-panel {
-  background: rgba(12, 18, 32, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(30, 41, 59, 0.8);
+/* Flight-instrument card & panel surfaces (No glowing blurred blobs) */
+.instrument-panel {
+  background: #0E1420;
+  border: 1px solid #1A2438;
 }
 
-.glass-panel-elevated {
-  background: rgba(17, 25, 43, 0.85);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(51, 65, 85, 0.6);
+.instrument-card {
+  background: #111827;
+  border: 1px solid #1A2438;
+}
+
+.instrument-elevated {
+  background: #151E30;
+  border: 1px solid #2A3B57;
 }

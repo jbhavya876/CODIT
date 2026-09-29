@@ -3,7 +3,7 @@ import { api } from '../api.js'
 import { navigate } from '../router.js'
 
 const PIPELINE_STEPS = [
-  { id: 1, title: 'Intake & Security Gate', desc: 'Pre-flight path sanitization, Zip-Slip check & bomb quotas' },
+  { id: 1, title: 'Intake & Security Gate', desc: 'Pre-flight path sanitization, Zip-Slip check & decompression bomb quotas' },
   { id: 2, title: 'AST Parsing Engine', desc: 'Tree-sitter syntactic walks, import extraction & call graphs' },
   { id: 3, title: 'Vulnerability Telemetry', desc: 'OSV API advisory queries & high-entropy secret scanning' },
   { id: 4, title: 'ONNX & SHAP Models', desc: 'Architectural fragility prediction & Shapley attribution scoring' },
@@ -12,7 +12,7 @@ const PIPELINE_STEPS = [
 
 export default function IngestPage() {
   const [activeTab, setActiveTab] = useState('public') // 'public', 'private', 'zip'
-  const [publicUrl, setPublicUrl] = useState('https://github.com/jbhavya876/alt_sentinal')
+  const [publicUrl, setPublicUrl] = useState('https://github.com/charmi-reddy/Dependency-Detective')
   const [publicRef, setPublicRef] = useState('main')
 
   const [privateRepo, setPrivateRepo] = useState('')
@@ -109,42 +109,28 @@ export default function IngestPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header */}
       <div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-400 font-mono">
+        <div className="inline-flex items-center gap-2 rounded border border-sky-900/60 bg-sky-950/40 px-2.5 py-0.5 text-xs font-semibold text-sky-400 font-mono">
           <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-pulse" />
           Module 1 · Multi-Tier Codebase Ingestion
         </div>
-        <h1 className="mt-3 text-2xl font-black tracking-tight text-slate-100 sm:text-3xl">
+        <h1 className="mt-2.5 text-xl sm:text-2xl font-black tracking-tight text-slate-100 font-mono">
           Ingest Target Codebase
         </h1>
-        <p className="mt-2 text-sm text-slate-400 leading-relaxed">
+        <p className="mt-1 text-xs text-slate-400 leading-relaxed font-sans">
           Accepts public GitHub repositories, private repositories via scoped GitHub App tokens, or zero-retention ZIP archives.
           All source files are evaluated purely via static AST analysis — no untrusted scripts or package builds are ever executed.
         </p>
       </div>
 
       {/* Quick Ingestion Presets */}
-      <div className="rounded-2xl border border-slate-800 bg-[#0c1220]/80 p-5 shadow-xl backdrop-blur-md">
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2.5">
-          Quick Ingest Presets (Click to Load Target):
+      <div className="rounded-xl border border-[#1A2438] bg-[#0E1420] p-4">
+        <span className="text-xs font-bold uppercase tracking-wider font-mono text-slate-400 block mb-2">
+          QUICK INGEST PRESETS:
         </span>
-        <div className="flex flex-wrap gap-2.5">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('public')
-              setPublicUrl('https://github.com/jbhavya876/alt_sentinal')
-              setPublicRef('main')
-            }}
-            className="rounded-xl border border-sky-500/40 bg-sky-950/30 px-3.5 py-2 text-xs text-sky-300 hover:bg-sky-900/40 hover:border-sky-500/60 transition flex items-center gap-2"
-          >
-            <span>🎯</span>
-            <span className="font-mono font-bold">jbhavya876/alt_sentinal</span>
-            <span className="text-[10px] text-slate-400 font-mono">(Algorand dApp)</span>
-          </button>
-
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => {
@@ -152,60 +138,74 @@ export default function IngestPage() {
               setPublicUrl('https://github.com/charmi-reddy/Dependency-Detective')
               setPublicRef('main')
             }}
-            className="rounded-xl border border-slate-700 bg-slate-900/70 px-3.5 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-slate-100 transition flex items-center gap-2"
+            className="rounded border border-[#1A2438] bg-[#111827] px-3 py-1.5 text-xs font-mono text-slate-300 hover:border-sky-500/60 hover:text-slate-100 transition flex items-center gap-2"
           >
-            <span>🌐</span>
-            <span className="font-mono font-bold">charmi-reddy/Dependency-Detective</span>
-            <span className="text-[10px] text-slate-400 font-mono">(Microservices Graph)</span>
+            <span className="text-sky-400">🌐</span>
+            <span className="font-bold">charmi-reddy/Dependency-Detective</span>
+            <span className="text-[10px] text-slate-500">(Microservices Graph)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('public')
+              setPublicUrl('https://github.com/jbhavya876/alt_sentinal')
+              setPublicRef('main')
+            }}
+            className="rounded border border-sky-900/60 bg-sky-950/40 px-3 py-1.5 text-xs font-mono text-sky-300 hover:border-sky-500 transition flex items-center gap-2"
+          >
+            <span>🎯</span>
+            <span className="font-bold">jbhavya876/alt_sentinal</span>
+            <span className="text-[10px] text-slate-400">(Algorand dApp)</span>
           </button>
         </div>
       </div>
 
       {/* Intake Tabs */}
-      <div className="flex border-b border-slate-800">
+      <div className="flex border-b border-[#1A2438] font-mono text-xs overflow-x-auto whitespace-nowrap">
         <button
           onClick={() => { setActiveTab('public'); setError(null); }}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-2 ${
+          className={`px-4 py-2.5 font-bold uppercase tracking-wider border-b-2 transition flex items-center gap-2 ${
             activeTab === 'public'
-              ? 'border-sky-500 text-sky-400 bg-slate-900/40'
+              ? 'border-sky-500 text-sky-400 bg-[#0E1420]'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
           <span>🌐</span> Public GitHub Repo
-          <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-300 font-mono">Tree API</span>
+          <span className="rounded bg-[#111827] border border-[#1A2438] px-1.5 py-0.2 text-[9px] text-slate-400 font-mono">TREE API</span>
         </button>
 
         <button
           onClick={() => { setActiveTab('zip'); setError(null); }}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-2 ${
+          className={`px-4 py-2.5 font-bold uppercase tracking-wider border-b-2 transition flex items-center gap-2 ${
             activeTab === 'zip'
-              ? 'border-sky-500 text-sky-400 bg-slate-900/40'
+              ? 'border-sky-500 text-sky-400 bg-[#0E1420]'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
           <span>📦</span> ZIP Archive Upload
-          <span className="rounded-full bg-emerald-950 border border-emerald-500/40 px-2 py-0.5 text-[10px] text-emerald-400 font-mono">Zero Retention</span>
+          <span className="rounded border border-emerald-900/60 bg-emerald-950/40 px-1.5 py-0.2 text-[9px] text-emerald-400 font-mono">ZERO RETENTION</span>
         </button>
 
         <button
           onClick={() => { setActiveTab('private'); setError(null); }}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-2 ${
+          className={`px-4 py-2.5 font-bold uppercase tracking-wider border-b-2 transition flex items-center gap-2 ${
             activeTab === 'private'
-              ? 'border-sky-500 text-sky-400 bg-slate-900/40'
+              ? 'border-sky-500 text-sky-400 bg-[#0E1420]'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
           <span>🔒</span> Private Repo (GitHub App)
-          <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-300 font-mono">Sandbox Clone</span>
+          <span className="rounded bg-[#111827] border border-[#1A2438] px-1.5 py-0.2 text-[9px] text-slate-400 font-mono">SANDBOX</span>
         </button>
       </div>
 
       {/* Tab Panels */}
-      <div className="rounded-2xl border border-slate-800 bg-[#0c1220]/80 p-6 shadow-xl backdrop-blur-md">
+      <div className="rounded-xl border border-[#1A2438] bg-[#0E1420] p-5">
         {activeTab === 'public' && (
-          <form onSubmit={handlePublicSubmit} className="space-y-4">
+          <form onSubmit={handlePublicSubmit} className="space-y-4 font-mono text-xs">
             <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
                 Public GitHub Repository URL or Slug
               </label>
               <input
@@ -214,15 +214,15 @@ export default function IngestPage() {
                 onChange={(e) => setPublicUrl(e.target.value)}
                 placeholder="https://github.com/owner/repository"
                 required
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-sky-500 focus:outline-none font-mono"
+                className="w-full rounded border border-[#1A2438] bg-[#080B11] px-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 focus:border-sky-500 focus:outline-none"
               />
-              <p className="mt-1.5 text-xs text-slate-500">
+              <p className="mt-1 text-[11px] text-slate-500 font-sans">
                 Fetched recursively via GitHub REST API tree endpoints with rate-limit protection. Zero arbitrary code execution.
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
                 Branch / Git Reference
               </label>
               <input
@@ -230,14 +230,14 @@ export default function IngestPage() {
                 value={publicRef}
                 onChange={(e) => setPublicRef(e.target.value)}
                 placeholder="main"
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-sky-500 focus:outline-none font-mono"
+                className="w-full rounded border border-[#1A2438] bg-[#080B11] px-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 focus:border-sky-500 focus:outline-none"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="rounded-xl bg-sky-500 px-6 py-2.5 text-sm font-bold text-slate-950 hover:bg-sky-400 disabled:opacity-50 transition shadow-lg shadow-sky-500/25"
+              className="rounded border border-sky-500 bg-sky-500 px-5 py-2 text-xs font-bold uppercase tracking-wider text-slate-950 hover:bg-sky-400 disabled:opacity-50 transition"
             >
               {loading ? 'Executing Full Audit Pipeline...' : 'Fetch & Analyze Codebase →'}
             </button>
@@ -246,32 +246,32 @@ export default function IngestPage() {
 
         {activeTab === 'zip' && (
           <form onSubmit={handleZipSubmit} className="space-y-4">
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 text-xs text-emerald-300 space-y-1">
-              <div className="font-bold flex items-center gap-1.5">
-                <span>🛡️</span> Security Guarantees (Section 9 Non-Negotiables)
+            <div className="rounded-lg border border-emerald-900/60 bg-emerald-950/20 p-3.5 text-xs text-emerald-300 space-y-1">
+              <div className="font-bold font-mono uppercase tracking-wider flex items-center gap-1.5">
+                <span>🛡️</span> Non-Negotiable Privacy & Defense Guarantee
               </div>
-              <p className="text-[11px] leading-relaxed text-emerald-200/90">
-                Uploaded archives are extracted inside an isolated, network-isolated sandbox. All files are purged immediately post-audit.
-                Pre-extraction validation rejects Zip-Slip path traversals (../) and decompression bombs (&gt;250MB uncompressed, &gt;5,000 files).
+              <p className="text-[11px] leading-relaxed text-emerald-200/90 font-sans">
+                Pre-extraction validation protects against Zip-Slip and Zip-Bomb attacks (&gt;250MB uncompressed, &gt;5,000 files).
+                Archives are extracted inside an isolated ephemeral memory sandbox and all source files are permanently destroyed immediately post-audit.
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider font-mono mb-1.5">
                 Select ZIP Archive
               </label>
               <input
                 type="file"
                 accept=".zip"
                 onChange={(e) => setZipFile(e.target.files?.[0] || null)}
-                className="block w-full text-xs text-slate-400 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-800 file:px-4 file:py-2 file:text-xs file:font-bold file:text-slate-200 hover:file:bg-slate-700 cursor-pointer"
+                className="block w-full text-xs text-slate-400 file:mr-4 file:rounded file:border file:border-[#1A2438] file:bg-[#111827] file:px-3 file:py-1.5 file:text-xs file:font-mono file:font-bold file:text-slate-200 hover:file:bg-slate-800 cursor-pointer font-mono"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading || !zipFile}
-              className="rounded-xl bg-sky-500 px-6 py-2.5 text-sm font-bold text-slate-950 hover:bg-sky-400 disabled:opacity-50 transition shadow-lg shadow-sky-500/25"
+              className="rounded border border-sky-500 bg-sky-500 px-5 py-2 text-xs font-bold font-mono uppercase tracking-wider text-slate-950 hover:bg-sky-400 disabled:opacity-50 transition"
             >
               {loading ? 'Validating & Extracting in Sandbox...' : 'Upload & Audit ZIP'}
             </button>
@@ -279,19 +279,19 @@ export default function IngestPage() {
         )}
 
         {activeTab === 'private' && (
-          <form onSubmit={handlePrivateSubmit} className="space-y-4">
-            <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-xs text-amber-300 space-y-1">
-              <div className="font-bold flex items-center gap-1.5">
-                <span>🔑</span> Scoped GitHub App Access
+          <form onSubmit={handlePrivateSubmit} className="space-y-4 font-mono text-xs">
+            <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-3.5 text-xs text-amber-300 space-y-1">
+              <div className="font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <span>🔑</span> GitHub App Integration & Scoped Access
               </div>
-              <p className="text-[11px] leading-relaxed text-amber-200/90">
-                Provide a scoped installation access token with read-only <code>contents</code> permission.
-                Shallow clone (<code>--depth 1</code>) runs inside an isolated ephemeral container with disabled network egress and zero git hooks.
+              <p className="text-[11px] leading-relaxed text-amber-200/90 font-sans">
+                Provide a scoped installation access token with read-only contents permission.
+                Shallow clone (--depth 1) runs inside an isolated container with disabled network egress and zero git hooks.
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
                 Repository Slug (owner/repo)
               </label>
               <input
@@ -300,12 +300,12 @@ export default function IngestPage() {
                 onChange={(e) => setPrivateRepo(e.target.value)}
                 placeholder="acme-corp/private-service"
                 required
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-sky-500 focus:outline-none font-mono"
+                className="w-full rounded border border-[#1A2438] bg-[#080B11] px-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 focus:border-sky-500 focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
                 GitHub App Token (Ephemeral Access)
               </label>
               <input
@@ -314,14 +314,14 @@ export default function IngestPage() {
                 onChange={(e) => setPrivateToken(e.target.value)}
                 placeholder="ghs_..."
                 required
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 focus:border-sky-500 focus:outline-none font-mono"
+                className="w-full rounded border border-[#1A2438] bg-[#080B11] px-3.5 py-2 text-xs text-slate-100 focus:border-sky-500 focus:outline-none"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="rounded-xl bg-sky-500 px-6 py-2.5 text-sm font-bold text-slate-950 hover:bg-sky-400 disabled:opacity-50 transition shadow-lg shadow-sky-500/25"
+              className="rounded border border-sky-500 bg-sky-500 px-5 py-2 text-xs font-bold uppercase tracking-wider text-slate-950 hover:bg-sky-400 disabled:opacity-50 transition"
             >
               {loading ? 'Cloning in Isolated Sandbox...' : 'Clone & Ingest Private Repo'}
             </button>
@@ -330,31 +330,31 @@ export default function IngestPage() {
 
         {/* Live Pipeline Stepper during Loading */}
         {loading && (
-          <div className="mt-6 rounded-2xl border border-sky-500/40 bg-slate-950/90 p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2 text-sm font-bold text-sky-400">
-                <span className="h-2 w-2 rounded-full bg-sky-400 animate-ping" />
-                Pipeline Orchestrator Active
+          <div className="mt-5 rounded-lg border border-sky-900/60 bg-[#080B11] p-4 space-y-3 font-mono">
+            <div className="flex items-center justify-between border-b border-[#1A2438] pb-2.5">
+              <div className="flex items-center gap-2 text-xs font-bold text-sky-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-ping" />
+                PIPELINE ORCHESTRATOR ACTIVE
               </div>
-              <span className="text-xs font-mono text-slate-400">Stage {currentStep} of 5</span>
+              <span className="text-[10px] text-slate-400">STAGE {currentStep} OF 5</span>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {PIPELINE_STEPS.map((step) => {
                 const isCurrent = step.id === currentStep
                 const isDone = step.id < currentStep
                 return (
-                  <div key={step.id} className="flex items-start gap-3 text-xs">
+                  <div key={step.id} className="flex items-start gap-2.5 text-xs">
                     <div className="mt-0.5 shrink-0">
-                      {isDone && <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 font-bold">✓</span>}
-                      {isCurrent && <div className="h-5 w-5 rounded-full border-2 border-sky-400 border-t-transparent animate-spin" />}
-                      {!isDone && !isCurrent && <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-slate-500 font-mono text-[10px]">{step.id}</span>}
+                      {isDone && <span className="flex h-4 w-4 items-center justify-center rounded bg-emerald-950/60 border border-emerald-800 text-emerald-400 text-[9px] font-bold">✓</span>}
+                      {isCurrent && <div className="h-4 w-4 rounded border-2 border-sky-400 border-t-transparent animate-spin" />}
+                      {!isDone && !isCurrent && <span className="flex h-4 w-4 items-center justify-center rounded bg-[#111827] border border-[#1A2438] text-slate-500 text-[9px]">{step.id}</span>}
                     </div>
                     <div>
-                      <div className={`font-semibold ${isCurrent ? 'text-sky-300 font-bold' : isDone ? 'text-slate-200' : 'text-slate-500'}`}>
+                      <div className={`font-semibold ${isCurrent ? 'text-sky-300' : isDone ? 'text-slate-200' : 'text-slate-500'}`}>
                         {step.title}
                       </div>
-                      <div className="text-slate-400 text-[11px]">{step.desc}</div>
+                      <div className="text-slate-400 text-[10px] font-sans">{step.desc}</div>
                     </div>
                   </div>
                 )
@@ -365,28 +365,28 @@ export default function IngestPage() {
 
         {/* Error Notification */}
         {error && (
-          <div className="mt-6 rounded-xl border border-rose-500/50 bg-rose-950/30 p-4 text-xs text-rose-300">
-            <strong>Ingestion Error:</strong> {error}
+          <div className="mt-5 rounded-lg border border-rose-900/80 bg-[#1E0A10] p-3.5 text-xs text-rose-300 font-mono">
+            <strong>INGESTION ERROR:</strong> {error}
           </div>
         )}
 
         {/* Success Confirmation & Direct Cockpit Link */}
         {result && (
-          <div className="mt-6 rounded-2xl border border-emerald-500/40 bg-emerald-950/20 p-5 space-y-4">
+          <div className="mt-5 rounded-lg border border-emerald-900/60 bg-emerald-950/20 p-4 space-y-3 font-mono">
             <div className="flex items-center justify-between">
-              <div className="text-emerald-400 font-bold text-sm flex items-center gap-2">
-                <span className="text-lg">✓</span> Codebase Ingested & Fully Analyzed
+              <div className="text-emerald-400 font-bold text-xs flex items-center gap-2">
+                <span>✓</span> CODEBASE INGESTED & FULLY ANALYZED
               </div>
-              <span className="text-xs text-slate-400 font-mono">
+              <span className="text-[10px] text-slate-400">
                 {result.file_count} files ({result.total_size_kb} KB)
               </span>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {Object.entries(result.languages || {}).map(([lang, count]) => (
                 <span
                   key={lang}
-                  className="rounded-lg bg-slate-800/80 px-2.5 py-1 text-xs font-mono text-slate-300"
+                  className="rounded border border-[#1A2438] bg-[#111827] px-2 py-0.5 text-[10px] text-slate-300"
                 >
                   {lang}: {count}
                 </span>
@@ -394,31 +394,33 @@ export default function IngestPage() {
             </div>
 
             {result.analysis && (
-              <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3.5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+              <div className="rounded border border-[#1A2438] bg-[#0E1420] p-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
                 <div>
-                  <span className="text-slate-500 text-[10px] uppercase block">Audit Score</span>
-                  <span className="font-black text-slate-100 text-lg">{result.analysis.score}/100</span>
+                  <span className="text-slate-500 text-[9px] uppercase block">Audit Score</span>
+                  <span className="font-black text-slate-100 text-base">{result.analysis.score}/100</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 text-[10px] uppercase block">Maturity Phase</span>
+                  <span className="text-slate-500 text-[9px] uppercase block">Maturity Phase</span>
                   <span className="font-bold text-sky-400">{result.analysis.phase}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 text-[10px] uppercase block">ONNX Fragility</span>
+                  <span className="text-slate-500 text-[9px] uppercase block">ONNX Fragility</span>
                   <span className="font-bold text-amber-400">{result.analysis.onnx_fragility ?? 'Calculated'}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 text-[10px] uppercase block">Findings</span>
+                  <span className="text-slate-500 text-[9px] uppercase block">Findings</span>
                   <span className="font-bold text-slate-200">{result.analysis.findings_count}</span>
                 </div>
               </div>
             )}
 
             <div className="pt-2 flex items-center justify-between">
-              <span className="text-xs text-slate-400">Target: <code className="text-slate-200 font-mono font-semibold">{result.target}</code></span>
+              <span className="text-xs text-slate-400 font-sans">
+                Target: <code className="text-slate-200 font-mono font-semibold">{result.target}</code>
+              </span>
               <button
                 onClick={() => navigate('#/audit')}
-                className="rounded-xl bg-emerald-500 px-5 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/20"
+                className="rounded border border-emerald-500 bg-emerald-500 px-4 py-1.5 text-xs font-bold text-slate-950 hover:bg-emerald-400 transition"
               >
                 Launch Audit Cockpit →
               </button>

@@ -8,23 +8,22 @@ import X402VerificationModal from './components/X402VerificationModal.jsx'
 
 function Logo() {
   return (
-    <a href={href.audit()} className="flex items-center gap-3 group">
-      <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500/20 to-indigo-500/20 border border-sky-500/40 shadow-lg shadow-sky-500/10 group-hover:border-sky-400 transition">
-        <svg viewBox="0 0 32 32" className="h-5 w-5" aria-hidden>
-          <circle cx="16" cy="7" r="3.5" fill="#38bdf8" />
-          <circle cx="7" cy="24" r="3.5" fill="#34d399" />
-          <circle cx="25" cy="24" r="3.5" fill="#fbbf24" />
-          <path d="M16 11 8.5 21M16 11l7.5 10M11 24h10" stroke="#64748b" strokeWidth="1.8" fill="none" />
+    <a href={href.audit()} className="flex items-center gap-3 group focus-visible:outline-none">
+      <div className="flex h-8 w-8 items-center justify-center rounded border border-[#1A2438] bg-[#0E1420] text-sky-400 group-hover:border-sky-500/60 transition">
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polyline points="16 18 22 12 16 6" />
+          <polyline points="8 6 2 12 8 18" />
+          <line x1="12" y1="2" x2="12" y2="22" strokeDasharray="2 2" />
         </svg>
       </div>
       <div className="leading-tight">
-        <div className="text-base font-black tracking-wider text-slate-50 flex items-center gap-2">
-          <span className="tracking-widest">CODIT</span>
-          <span className="rounded bg-sky-500/20 text-sky-400 text-[10px] font-mono px-1.5 py-0.5 border border-sky-500/30 font-bold">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-sm font-black tracking-widest text-slate-100">CODIT</span>
+          <span className="rounded border border-[#1A2438] bg-[#111827] px-1.5 py-0.2 font-mono text-[9px] font-bold text-sky-400">
             v2.0
           </span>
         </div>
-        <div className="text-[11px] text-slate-400 font-medium">Intelligent Codebase Audit Oracle</div>
+        <div className="font-mono text-[10px] text-slate-500 tracking-tight uppercase">Static Codebase Oracle</div>
       </div>
     </a>
   )
@@ -32,28 +31,28 @@ function Logo() {
 
 function ModePill() {
   const { data, error } = useFetch(() => api.health(), [])
-  let cls = 'border-slate-800 bg-slate-900/60 text-slate-400'
+  let cls = 'border-[#1A2438] bg-[#0E1420] text-slate-400'
   let dot = 'bg-slate-500'
-  let label = 'connecting…'
+  let label = 'CONNECTING'
   if (error) {
-    cls = 'border-rose-500/40 bg-rose-950/20 text-rose-300'
-    dot = 'bg-rose-400'
-    label = 'graph offline'
+    cls = 'border-[#5C1220] bg-[#1E0A10] text-[#F43F5E]'
+    dot = 'bg-[#F43F5E]'
+    label = 'GRAPH OFFLINE'
   } else if (data?.mode === 'cognodb') {
-    cls = 'border-emerald-500/40 bg-emerald-950/20 text-emerald-300'
+    cls = 'border-emerald-900/60 bg-emerald-950/40 text-emerald-400'
     dot = 'bg-emerald-400'
-    label = 'CognoDB Bolt'
+    label = 'BOLT / COGNODB'
   } else if (data?.mode === 'demo') {
-    cls = 'border-amber-500/40 bg-amber-950/20 text-amber-300'
+    cls = 'border-amber-900/60 bg-amber-950/40 text-amber-400'
     dot = 'bg-amber-400'
-    label = data?.is_custom ? 'Active Ingest' : 'Demo Graph'
+    label = data?.is_custom ? 'CUSTOM GRAPH' : 'DEMO GRAPH'
   }
   return (
     <span
       title={data?.mode === 'demo'
         ? 'In-memory graph engine actively modeling ingested repository.'
         : 'Live openCypher property graph connected to CognoDB/Neo4j via official Bolt driver.'}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-mono font-medium ${cls}`}
+      className={`hidden md:inline-flex items-center gap-1.5 rounded border px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wider ${cls}`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
       {label}
@@ -65,8 +64,8 @@ function CodebaseTargetPill() {
   const { data } = useFetch(() => api.ingestStatus(), [])
   if (!data?.active_target || data.active_target === 'demo') {
     return (
-      <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/80 px-2.5 py-1 text-[11px] font-mono text-slate-400">
-        <span className="text-slate-500">Target:</span> Demo System
+      <span className="hidden sm:inline-flex items-center gap-1.5 rounded border border-[#1A2438] bg-[#0E1420] px-2 py-0.5 font-mono text-[10px] text-slate-400">
+        <span className="text-slate-500">TARGET:</span> DEMO SYSTEM
       </span>
     )
   }
@@ -74,10 +73,10 @@ function CodebaseTargetPill() {
   return (
     <span
       title={`Active Target: ${data.active_target} (${data.file_count} files)`}
-      className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-950/40 px-2.5 py-1 text-[11px] font-mono text-sky-300 shadow-sm shadow-sky-500/10"
+      className="hidden sm:inline-flex items-center gap-1.5 rounded border border-sky-900/60 bg-sky-950/40 px-2 py-0.5 font-mono text-[10px] text-sky-300"
     >
       <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-pulse" />
-      <span className="text-sky-400/80">Target:</span> {cleanTarget}
+      <span className="text-sky-400/80">TARGET:</span> {cleanTarget}
       <span className="rounded bg-sky-900/60 px-1 py-0.2 text-[9px] text-sky-200">{data.file_count} files</span>
     </span>
   )
@@ -105,35 +104,33 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#060911] text-slate-100 font-sans flex flex-col justify-between selection:bg-sky-500/30 selection:text-sky-200">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(80%_50%_at_50%_-10%,rgba(56,189,248,0.06),transparent)]" />
-      
-      {/* Precision Top Navbar */}
-      <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#060911]/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+    <div className="min-h-screen bg-[#080B11] text-slate-200 font-sans flex flex-col justify-between selection:bg-sky-500/30 selection:text-sky-200">
+      {/* Precision Instrument Top Flight-Bar */}
+      <header className="sticky top-0 z-40 border-b border-[#1A2438] bg-[#080B11]/95 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-3 py-2 sm:px-6 sm:py-2.5">
           <Logo />
 
-          {/* Center Two-Pillar Switcher */}
-          <nav className="flex items-center gap-1 text-sm bg-slate-950/70 p-1 rounded-xl border border-slate-800/80">
+          {/* Two-Pillar Instrument Mode Switcher */}
+          <nav aria-label="Primary Navigation" className="flex items-center gap-1 bg-[#0E1420] p-0.5 sm:p-1 rounded border border-[#1A2438]">
             <a
               href="#/audit"
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+              className={`rounded px-2 sm:px-3 py-1 font-mono text-[11px] sm:text-xs font-bold tracking-wider uppercase transition ${
                 route.name === 'audit'
-                  ? 'bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20'
-                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/60'
+                  ? 'bg-sky-500 text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-100 hover:bg-[#111827]'
               }`}
             >
-              Audit Cockpit
+              [1] Audit Cockpit
             </a>
             <a
               href="#/ingest"
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+              className={`rounded px-2 sm:px-3 py-1 font-mono text-[11px] sm:text-xs font-bold tracking-wider uppercase transition ${
                 route.name === 'ingest'
-                  ? 'bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20'
-                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/60'
+                  ? 'bg-sky-500 text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-100 hover:bg-[#111827]'
               }`}
             >
-              Ingest Repo
+              [2] Ingest Repo
             </a>
           </nav>
 
@@ -145,15 +142,16 @@ export default function App() {
             <button
               onClick={() => setShowX402Modal(true)}
               data-testid="x402-settle-btn"
-              className={`hidden sm:inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-mono font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 rounded border px-2 sm:px-2.5 py-1 font-mono text-[10px] font-bold tracking-wider uppercase transition ${
                 wallet.connected
-                  ? 'border-emerald-500/40 bg-emerald-950/20 text-emerald-300 hover:bg-emerald-950/40'
-                  : 'border-amber-500/40 bg-amber-950/20 text-amber-300 hover:bg-amber-950/40'
+                  ? 'border-emerald-800 bg-emerald-950/30 text-emerald-300 hover:bg-emerald-950/60'
+                  : 'border-amber-800 bg-amber-950/30 text-amber-300 hover:bg-amber-950/60'
               }`}
               title="On-Chain Settlement via Algorand x402"
             >
               <span className={`h-1.5 w-1.5 rounded-full ${wallet.connected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-              {wallet.connected ? shortAddress : 'x402 Settle'}
+              <span className="hidden xs:inline">{wallet.connected ? shortAddress : 'x402 Settle'}</span>
+              <span className="xs:hidden">{wallet.connected ? 'Connected' : 'x402'}</span>
             </button>
           </div>
         </div>
@@ -164,11 +162,25 @@ export default function App() {
         {page}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 py-6 bg-[#060911]/90">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 text-xs text-slate-500 sm:px-6">
-          <span>CODIT · Production-Readiness Oracle & Static Codebase Intelligence</span>
-          <span className="font-mono text-[11px] text-slate-600">FastAPI · openCypher · ONNX Runtime · Tree-sitter · SHAP</span>
+      {/* Flight-Instrument Footer */}
+      <footer className="border-t border-[#1A2438] py-4 bg-[#080B11]">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 text-xs text-slate-500 sm:px-6">
+          <div className="flex items-center gap-2 font-mono text-[11px]">
+            <span className="font-bold text-slate-400">CODIT ENGINE</span>
+            <span className="text-[#1A2438]">|</span>
+            <span>Static Codebase Intelligence & Production-Readiness Oracle</span>
+          </div>
+          <div className="font-mono text-[10px] text-slate-500 flex items-center gap-3">
+            <span>FastAPI</span>
+            <span className="text-[#1A2438]">•</span>
+            <span>openCypher</span>
+            <span className="text-[#1A2438]">•</span>
+            <span>ONNX Runtime</span>
+            <span className="text-[#1A2438]">•</span>
+            <span>Tree-sitter</span>
+            <span className="text-[#1A2438]">•</span>
+            <span>Algorand x402</span>
+          </div>
         </div>
       </footer>
 
