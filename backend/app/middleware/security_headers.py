@@ -35,9 +35,10 @@ _SECURITY_HEADERS = {
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-        "img-src 'self' data: blob: https://*.perawallet.app; "
+        "img-src 'self' data: blob: https://*.perawallet.app https://*.walletconnect.com https://*.walletconnect.org https://s3.amazonaws.com https://*.amazonaws.com; "
         "font-src 'self' data: https://fonts.gstatic.com; "
-        "connect-src 'self' https://wc.perawallet.app https://*.algonode.cloud wss://*.walletconnect.com wss://*.walletconnect.org; "
+        "connect-src 'self' data: blob: https://*.perawallet.app wss://*.perawallet.app https://*.algonode.cloud https://*.walletconnect.com wss://*.walletconnect.com https://*.walletconnect.org wss://*.walletconnect.org https://s3.amazonaws.com https://*.amazonaws.com; "
+        "media-src 'self' data: blob: https://*.perawallet.app https://s3.amazonaws.com; "
         "frame-ancestors 'none'"
     ),
     # Only sent when the server is behind TLS termination

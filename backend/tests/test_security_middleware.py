@@ -84,6 +84,16 @@ class TestSecurityHeaders:
         r = rl_off_client.get("/api/health")
         assert "content-security-policy" in r.headers
 
+    def test_csp_pera_connect_compatible(self, rl_off_client):
+        """Verify CSP allows Pera Connect websocket bridge and SVG data: URI image generation."""
+        r = rl_off_client.get("/api/health")
+        csp = r.headers.get("content-security-policy", "")
+        assert "wss://*.perawallet.app" in csp
+        assert "https://*.perawallet.app" in csp
+        assert "data:" in csp
+        assert "blob:" in csp
+        assert "https://*.algonode.cloud" in csp
+
     def test_xss_protection(self, rl_off_client):
         r = rl_off_client.get("/api/health")
         assert r.headers.get("x-xss-protection") == "1; mode=block"

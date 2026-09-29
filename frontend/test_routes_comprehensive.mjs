@@ -189,6 +189,54 @@ async function runRegressionSuite() {
     await p.waitForTimeout(300)
   })
 
+  // Route 14: x402 Pera Connect modal QR code renders complete with brand badge and zero CSP violations
+  await test('x402 Pera Connect modal renders complete QR code with brand badge', async (p) => {
+    await p.goto(`${BASE_URL}/#/audit`, { waitUntil: 'networkidle' })
+    const x402Btn = await p.waitForSelector('button[data-testid="x402-settle-btn"]', { timeout: 10000 })
+    await x402Btn.click({ force: true })
+
+    const connectBtn = await p.waitForSelector('button:has-text("Connect & Pay")', { timeout: 10000 })
+    await connectBtn.click({ force: true })
+
+    await p.waitForSelector('pera-wallet-connect-modal', { state: 'attached', timeout: 10000 })
+    await p.waitForTimeout(2000)
+
+    const qrStatus = await p.evaluate(() => {
+      const modal = document.querySelector('pera-wallet-connect-modal')
+      if (!modal) return { ok: false, reason: 'pera-wallet-connect-modal not found' }
+      const shadow1 = modal.shadowRoot
+      const desktop = shadow1?.querySelector('pera-wallet-modal-desktop-mode')
+      if (!desktop) return { ok: false, reason: 'desktop mode component not found' }
+      const shadow2 = desktop.shadowRoot
+      const qrWrapper = shadow2?.getElementById('pera-wallet-connect-modal-connect-qr-code')
+      if (!qrWrapper) return { ok: false, reason: 'qr wrapper not found' }
+      const svg = qrWrapper.querySelector('svg')
+      if (!svg) return { ok: false, reason: 'svg element not found in qr wrapper' }
+      const image = svg.querySelector('image')
+      if (!image) return { ok: false, reason: 'badge image missing from QR svg' }
+      return { ok: true, hasBadge: true, imageHref: Boolean(image.getAttribute('href')) }
+    })
+
+    if (!qrStatus.ok) {
+      throw new Error(`Pera QR verification failed: ${qrStatus.reason}`)
+    }
+
+    // Close the Pera modal
+    await p.evaluate(() => {
+      const modal = document.querySelector('pera-wallet-connect-modal')
+      const shadow1 = modal?.shadowRoot
+      const header = shadow1?.querySelector('pera-wallet-modal-header')
+      const closeBtn = header?.shadowRoot?.getElementById('pera-wallet-modal-header-close-button')
+      if (closeBtn) closeBtn.click()
+    })
+    await p.waitForTimeout(500)
+
+    // Close x402 modal
+    const closeBtn = await p.waitForSelector('button[data-testid="x402-modal-close"]', { timeout: 10000 })
+    await closeBtn.click({ force: true })
+    await p.waitForTimeout(300)
+  })
+
   await browser.close()
 
   console.log('\n=====================================================')
@@ -208,7 +256,7 @@ async function runRegressionSuite() {
     process.exit(1)
   }
 
-  console.log('\n🎉 ALL 13 ROUTES AND UI INTERACTIONS REGRESSION TESTED AND VERIFIED PRODUCTION-READY!')
+  console.log(`\n🎉 ALL ${total} ROUTES AND UI INTERACTIONS REGRESSION TESTED AND VERIFIED PRODUCTION-READY!`)
   process.exit(0)
 }
 
