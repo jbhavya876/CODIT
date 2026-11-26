@@ -279,6 +279,48 @@ def create_staged_audit(
     }
 
 
+def save_history_result(audit_id: str, history_result: Any) -> None:
+    """Persist scrubbed HistoryResult (no messages/names/emails/source) on AuditRow."""
+    cov_dict = history_result.coverage.model_dump()
+    proc_dict = {
+        "source_commit": history_result.source_commit,
+        "source_tree": history_result.source_tree,
+        "commits": [
+            {
+                "sha": c.sha,
+                "short": c.short,
+                "date": c.date,
+                "author_key": c.author_key,
+                "has_agent_trailer": c.has_agent_trailer,
+                "agent_id": c.agent_id,
+                "attribution_basis": c.attribution_basis,
+                "attribution_confidence": c.attribution_confidence,
+                "claims_tests_pass": c.claims_tests_pass,
+                "skipped_deep": c.skipped_deep,
+                "files_changed": c.files_changed,
+                "prod_lines_delta": c.prod_lines_delta,
+                "test_lines_delta": c.test_lines_delta,
+                "shallow_baseline": c.shallow_baseline,
+            }
+            for c in history_result.commits
+        ],
+        "head_tooling_present": history_result.head_tooling_present,
+        "series": history_result.series,
+    }
+    with session_scope() as session:
+        row = session.get(AuditRow, audit_id)
+        if row is not None:
+            row.source_commit = history_result.source_commit
+            row.source_tree = history_result.source_tree
+            existing_cov = dict(row.coverage_json or {})
+            existing_cov["history"] = cov_dict
+            if not cov_dict.get("assessed") or cov_dict.get("shallow_boundary") or cov_dict.get("caps_hit"):
+                existing_cov["partial"] = True
+            row.coverage_json = existing_cov
+            row.process_json = proc_dict
+            row.ownership_json = history_result.ownership or {}
+
+
 def get_staged_codebase(audit_id: str) -> Optional[Dict[str, Any]]:
     stage_dir = _staging_path(audit_id)
     meta_file = stage_dir / "meta.json"
