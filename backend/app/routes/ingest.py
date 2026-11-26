@@ -1,24 +1,24 @@
 """
 Ingestion routes for Public GitHub repos, Private GitHub repos, and ZIP uploads.
+
+Backed by per-audit staging and signed cookies via `audit_service` (ADR-0001).
 """
 
 from __future__ import annotations
 
-import io
-import shutil
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel
 
 from backend.app.config import Config
-from backend.app.ingestion.github_fetch import fetch_public_repo, GitHubIngestionError
-from backend.app.ingestion.git_clone import clone_private_repo, GitCloneError
+from backend.app.ingestion.git_clone import GitCloneError, clone_private_repo
+from backend.app.ingestion.github_fetch import GitHubIngestionError, fetch_public_repo
 from backend.app.ingestion.models import FileEntry
-from backend.app.ingestion.zip_extract import extract_zip, purge_extracted_files, ZipSecurityError
-from backend.app.state import get_active_codebase, set_active_codebase
+from backend.app.ingestion.zip_extract import ZipSecurityError, extract_zip, purge_extracted_files
+from backend.app.services import audit_service
 
 router = APIRouter(prefix="/api/ingest", tags=["ingestion"])
 
@@ -34,9 +34,44 @@ class PrivateRepoRequest(BaseModel):
     branch: Optional[str] = None
 
 
+def get_active_codebase(request: Optional[Request] = None) -> Dict[str, Any]:
+    """Legacy wrapper reading from staged audit cookie or latest staged manifest."""
+    audit_id = audit_service.get_audit_id_from_request(request)
+    if audit_id:
+        staged = audit_service.get_staged_codebase(audit_id)
+        if staged is not None:
+            return staged
+        row = audit_service.get_audit_row(audit_id)
+        if row is not None:
+            cov = row.coverage_json or {}
+            return {
+                "audit_id": row.id,
+                "target": row.source_ref,
+                "type": row.source_kind,
+                "entries": [],
+                "languages": {},
+                "file_count": cov.get("files_total", 0),
+                "total_size_kb": 0,
+                "temp_dir": None,
+            }
+    return audit_service.get_latest_staged_codebase()
+
+
+def set_active_codebase(
+    target: str,
+    target_type: str,
+    entries: List[FileEntry],
+    temp_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Legacy wrapper that stages entries under a fresh audit_id."""
+    audit_id, summary = audit_service.create_staged_audit(target, target_type, entries, temp_dir=temp_dir)
+    summary["audit_id"] = audit_id
+    return summary
+
+
 @router.get("/status")
-def ingestion_status():
-    current = get_active_codebase()
+def ingestion_status(request: Request):
+    current = get_active_codebase(request)
     return {
         "active_target": current["target"],
         "type": current["type"],
@@ -47,8 +82,7 @@ def ingestion_status():
 
 
 @router.post("/public")
-def ingest_public_repo(payload: PublicRepoRequest):
-    # Validate URL before making any network request
+def ingest_public_repo(payload: PublicRepoRequest, response: Response):
     url = payload.url.strip()
     if not url.startswith("https://github.com/"):
         raise HTTPException(
@@ -60,11 +94,18 @@ def ingest_public_repo(payload: PublicRepoRequest):
         )
     try:
         entries = fetch_public_repo(url, ref=payload.ref or "main")
-        summary = set_active_codebase(url, "public", entries)
+        audit_id, summary = audit_service.create_staged_audit(url, "public", entries)
+        audit_service.set_audit_cookie(response, audit_id)
         return {
             "status": "ok",
+            "audit_id": audit_id,
             "message": f"Successfully ingested public repository: {url}",
-            **summary,
+            "target": summary["target"],
+            "type": summary["type"],
+            "languages": summary["languages"],
+            "file_count": summary["file_count"],
+            "total_size_kb": summary["total_size_kb"],
+            "temp_dir": summary["temp_dir"],
         }
     except GitHubIngestionError as exc:
         raise HTTPException(status_code=400, detail={"code": "github_ingest_error", "message": str(exc)})
@@ -73,15 +114,13 @@ def ingest_public_repo(payload: PublicRepoRequest):
 
 
 @router.post("/zip")
-async def ingest_zip_upload(file: UploadFile = File(...)):
-    # Validate filename
+async def ingest_zip_upload(response: Response, file: UploadFile = File(...)):
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise HTTPException(
             status_code=400,
             detail={"code": "invalid_file", "message": "Only .zip archive uploads are supported."},
         )
 
-    # Read uploaded bytes and enforce per-file size limit
     content = await file.read()
     max_bytes = Config.MAX_INDIVIDUAL_FILE_MB * 1024 * 1024
     if len(content) > max_bytes:
@@ -99,14 +138,23 @@ async def ingest_zip_upload(file: UploadFile = File(...)):
 
     try:
         entries = extract_zip(content, temp_dir)
-        summary = set_active_codebase(file.filename, "zip", entries, temp_dir=temp_dir)
+        audit_id, summary = audit_service.create_staged_audit(
+            file.filename, "zip", entries, temp_dir=temp_dir
+        )
+        if response is not None:
+            audit_service.set_audit_cookie(response, audit_id)
         return {
             "status": "ok",
+            "audit_id": audit_id,
             "message": f"Successfully extracted and validated ZIP archive '{file.filename}'.",
-            **summary,
+            "target": summary["target"],
+            "type": summary["type"],
+            "languages": summary["languages"],
+            "file_count": summary["file_count"],
+            "total_size_kb": summary["total_size_kb"],
+            "temp_dir": summary["temp_dir"],
         }
     except ZipSecurityError as exc:
-        # Pre-extraction security failure (Zip-Slip or Zip-Bomb)
         purge_extracted_files(temp_dir)
         raise HTTPException(
             status_code=400,
@@ -121,7 +169,7 @@ async def ingest_zip_upload(file: UploadFile = File(...)):
 
 
 @router.post("/private")
-def ingest_private_repo(payload: PrivateRepoRequest):
+def ingest_private_repo(payload: PrivateRepoRequest, response: Response):
     temp_dir = Path(tempfile.mkdtemp(prefix="audit_clone_"))
     try:
         entries = clone_private_repo(
@@ -130,11 +178,20 @@ def ingest_private_repo(payload: PrivateRepoRequest):
             destination_dir=temp_dir,
             branch=payload.branch,
         )
-        summary = set_active_codebase(payload.repo, "private", entries, temp_dir=temp_dir)
+        audit_id, summary = audit_service.create_staged_audit(
+            payload.repo, "private", entries, temp_dir=temp_dir
+        )
+        audit_service.set_audit_cookie(response, audit_id)
         return {
             "status": "ok",
+            "audit_id": audit_id,
             "message": f"Successfully cloned private repository: {payload.repo}",
-            **summary,
+            "target": summary["target"],
+            "type": summary["type"],
+            "languages": summary["languages"],
+            "file_count": summary["file_count"],
+            "total_size_kb": summary["total_size_kb"],
+            "temp_dir": summary["temp_dir"],
         }
     except GitCloneError as exc:
         purge_extracted_files(temp_dir)

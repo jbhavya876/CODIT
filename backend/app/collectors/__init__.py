@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Optional
+from typing import Dict, List
+
+from codit_core.fingerprint import compute_fingerprint
 
 from backend.app.collectors.duplication import run_duplication_collector
 from backend.app.collectors.models import AuditFinding
@@ -53,19 +55,21 @@ def run_all_collectors(
                 all_findings.extend(findings)
             except Exception as exc:
                 log.exception("Collector '%s' encountered an unhandled error: %s", collector_name, exc)
-                # Fallback: add a low-severity diagnostic finding indicating collector error
+                evidence_file = "package.json" if any("package.json" in f.path for f in files) else "requirements.txt"
                 all_findings.append(AuditFinding(
                     id=f"collector-error-{collector_name}",
                     dimension=collector_name,
                     severity="low",
                     confidence="low",
                     description=f"Diagnostic: Collector '{collector_name}' encountered an error during execution: {exc}",
-                    evidence_file="package.json" if any("package.json" in f.path for f in files) else "requirements.txt",
+                    evidence_file=evidence_file,
                     evidence_line=1,
                     rule_id="COLLECTOR_EXECUTION_ERROR",
+                    fingerprint=compute_fingerprint("COLLECTOR_EXECUTION_ERROR", evidence_file, collector_name),
+                    basis="ESTIMATE",
                 ))
 
-    # Validate constraint 9 on all emitted findings:
+    # Validate evidence & fingerprint presence on all emitted findings
     validated_findings: List[AuditFinding] = []
     for f in all_findings:
         if not f.evidence_file:
@@ -73,6 +77,8 @@ def run_all_collectors(
             continue
         if not f.confidence:
             f.confidence = "medium"
+        if not f.fingerprint:
+            f.fingerprint = compute_fingerprint(f.rule_id or f.id, f.evidence_file, f.description, commit_sha=f.commit_sha)
         validated_findings.append(f)
 
     return validated_findings

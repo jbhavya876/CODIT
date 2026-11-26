@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import logging
 import re
-import uuid
 from typing import Dict, List
+
+from codit_core.fingerprint import compute_fingerprint
 
 from backend.app.collectors.models import AuditFinding
 from backend.app.ingestion.models import FileEntry
@@ -68,8 +69,9 @@ def detect_scalability_antipatterns(
 
             for pattern, desc, severity, rule_id in HARDCODED_CONFIG_PATTERNS:
                 if re.search(pattern, line):
+                    fp = compute_fingerprint(rule_id, entry.path, line)
                     findings.append(AuditFinding(
-                        id=f"scale-config-{uuid.uuid4().hex[:6]}",
+                        id=f"scale-config-{fp[:8]}-{idx}",
                         dimension="scalability",
                         severity=severity,
                         confidence="high",
@@ -79,6 +81,8 @@ def detect_scalability_antipatterns(
                         rule_id=rule_id,
                         remediation="Extract connection parameters and network addresses into environment variables.",
                         component_id=entry.path,
+                        fingerprint=fp,
+                        basis="PATTERN",
                     ))
 
         # 2. Synchronous blocking calls inside async paths (Python)
@@ -102,8 +106,9 @@ def detect_scalability_antipatterns(
                 if in_async_func:
                     for blocking_call in SYNC_BLOCKING_CALLS:
                         if blocking_call in stripped:
+                            fp = compute_fingerprint("SYNC_IN_ASYNC_PATH", entry.path, f"{async_func_name}:{blocking_call}")
                             findings.append(AuditFinding(
-                                id=f"scale-blocking-{uuid.uuid4().hex[:6]}",
+                                id=f"scale-blocking-{fp[:8]}-{idx}",
                                 dimension="scalability",
                                 severity="high",
                                 confidence="high",
@@ -116,6 +121,8 @@ def detect_scalability_antipatterns(
                                 rule_id="SYNC_IN_ASYNC_PATH",
                                 remediation=f"Replace '{blocking_call}' with an async non-blocking client (e.g. httpx.AsyncClient or asyncio.sleep).",
                                 component_id=entry.path,
+                                fingerprint=fp,
+                                basis="AST PROOF",
                             ))
 
         # 3. N+1 Query Patterns (Query execution inside loop statements)
@@ -136,17 +143,20 @@ def detect_scalability_antipatterns(
             if in_loop:
                 for qpat in QUERY_CALL_PATTERNS:
                     if re.search(qpat, stripped) and not stripped.startswith(("#", "//")):
+                        fp = compute_fingerprint("N_PLUS_ONE_QUERY_SHAPE", entry.path, stripped)
                         findings.append(AuditFinding(
-                            id=f"scale-nplus1-{uuid.uuid4().hex[:6]}",
+                            id=f"scale-nplus1-{fp[:8]}-{idx}",
                             dimension="scalability",
                             severity="high",
                             confidence="high",
-                            description=f"Potential N+1 query pattern: database or network call inside loop construct.",
+                            description="Potential N+1 query pattern: database or network call inside loop construct.",
                             evidence_file=entry.path,
                             evidence_line=idx,
                             rule_id="N_PLUS_ONE_QUERY_SHAPE",
                             remediation="Batch operations using IN clauses, bulk queries, or dataloaders instead of per-item queries.",
                             component_id=entry.path,
+                            fingerprint=fp,
+                            basis="AST PROOF",
                         ))
                         break
 

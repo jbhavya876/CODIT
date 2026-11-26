@@ -5,13 +5,12 @@ dashboard, PDF, and Markdown export formats.
 
 from __future__ import annotations
 
-import time
-import uuid
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from backend.app.collectors.models import AuditFinding
 from backend.app.scoring.roadmap_synthesis import AuditRoadmap
+from backend.app.scoring.rubric import RUBRIC_VERSION
 from backend.app.scoring.rules_engine import AuditScorecard
 
 
@@ -30,15 +29,19 @@ class AuditReport:
     stats: Dict[str, Any]
     source_deleted: bool = False
     ml_insights: Dict[str, Any] = field(default_factory=dict)
+    rubric_version: str = RUBRIC_VERSION
+    audit_id: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        payload: Dict[str, Any] = {
             "report_id": self.report_id,
             "target_name": self.target_name,
             "target_type": self.target_type,
             "access_tier": self.access_tier,
             "created_at": self.created_at,
+            "rubric_version": self.rubric_version,
             "scorecard": {
+                "rubric_version": self.rubric_version,
                 "overall_score": self.scorecard.overall_score,
                 "phase": self.scorecard.phase,
                 "has_critical_blocker": self.scorecard.has_critical_blocker,
@@ -60,3 +63,6 @@ class AuditReport:
             "source_deleted": self.source_deleted,
             "ml_insights": self.ml_insights,
         }
+        if self.audit_id:
+            payload["audit_id"] = self.audit_id
+        return payload

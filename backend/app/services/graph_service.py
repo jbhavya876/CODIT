@@ -1,42 +1,39 @@
 """
-Backend-resolution layer.
+Backend-resolution layer with per-audit GraphHandle isolation and bounded LRU caching.
 
-Selects the CognoDB backend or the embedded demo backend based on
-configuration, then re-exports the query surface the routes consume. Also
-houses the criticality scoring — deliberately simple and graph-derived:
-
-    share  = total_affected / (all_components - 1)   # fraction of the system
-    HIGH   if share >= 15%   # one failure endangers >= 15% of all components
-    MEDIUM if share >= 10%
-    LOW    otherwise
-
-(Thresholds calibrated so the seeded system yields a clear spread — a handful
-of HIGH shared databases/infra, frequent MEDIUM single-owner services, and a
-long LOW tail of leaf components.)
-
-Both numbers come straight from graph traversal, nothing is hand-assigned.
+Each audit owns an isolated NetworkX GraphHandle reconstructed from persisted
+`graph_json` (ADR-0001). Un-scoped exploration routes fall back to the demo seed
+dataset unless an audit graph handle is explicitly passed.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any
+import threading
+from collections import OrderedDict
+from typing import Any, Optional
 
-from . import cognodb_graph, demo_graph
-from .cognodb_graph import DatabaseUnavailable  # re-exported for routes
+from backend.app.config import Config
+from backend.app.services import cognodb_graph, demo_graph
+from backend.app.services.cognodb_graph import DatabaseUnavailable  # re-exported for routes
+from backend.app.services.demo_graph import GraphHandle, deserialize_graph, serialize_graph
 
 log = logging.getLogger(__name__)
 
-_active = None
-_mode = "demo"
+_backend_driver = None
+_backend_mode = "demo"
 _startup_error: str | None = None
 
 HIGH_THRESHOLD = 0.15
 MEDIUM_THRESHOLD = 0.10
 
+_GRAPH_CACHE_MAX = 16
+_GRAPH_CACHE_LOCK = threading.Lock()
+_GRAPH_CACHE: OrderedDict[str, GraphHandle] = OrderedDict()
+
 
 def init_app(config: dict | None = None) -> None:
-    global _active, _mode, _startup_error
+    global _backend_driver, _backend_mode, _startup_error
     if config is None:
         config = {}
     requested = config.get("GRAPH_BACKEND", "auto")
@@ -44,106 +41,160 @@ def init_app(config: dict | None = None) -> None:
     user = config.get("COGNODB_USERNAME", "cognodb")
     password = config.get("COGNODB_PASSWORD", "")
 
-    use_demo = requested == "demo" or (requested == "auto" and not uri)
+    use_demo = (
+        Config.ENV == "production"
+        or requested == "demo"
+        or (requested == "auto" and not uri)
+    )
 
     if use_demo:
-        _active = demo_graph
-        _mode = "demo"
+        _backend_driver = demo_graph
+        _backend_mode = "demo"
         _startup_error = None
-        log.info("Graph backend: embedded demo dataset (set COGNODB_URI for CognoDB)")
+        log.info("Graph backend: isolated NetworkX / embedded demo dataset")
         return
 
     cognodb_graph.init(uri, user, password)
-    _active = cognodb_graph
-    _mode = "cognodb"
+    _backend_driver = cognodb_graph
+    _backend_mode = "cognodb"
     try:
         cognodb_graph.verify()
         _startup_error = None
         log.info("Graph backend: CognoDB at %s", uri)
     except DatabaseUnavailable as exc:
-        # Stay in cognodb mode: /health reports the outage and queries answer
-        # 503 gracefully instead of the app refusing to boot.
         _startup_error = str(exc)
         log.warning("CognoDB unreachable at startup: %s", exc)
 
 
 def mode() -> str:
-    return _mode
+    return _backend_mode
 
 
-def get_active_backend():
-    global _active
-    if _active is None:
+def get_backend_driver():
+    global _backend_driver
+    if _backend_driver is None:
         init_app({"GRAPH_BACKEND": "demo"})
-    return _active
+    return _backend_driver
 
 
-# --- Dynamic Graph Loading (Module 4) -----------------------------------------
+def cache_put_graph(audit_id: str, handle: GraphHandle) -> None:
+    with _GRAPH_CACHE_LOCK:
+        _GRAPH_CACHE[audit_id] = handle
+        _GRAPH_CACHE.move_to_end(audit_id)
+        while len(_GRAPH_CACHE) > _GRAPH_CACHE_MAX:
+            _GRAPH_CACHE.popitem(last=False)
 
 
-def load_assembled_graph(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -> None:
-    """Load assembled codebase graph into the active graph backend."""
-    global _active
-    if _active is None:
-        init_app({"GRAPH_BACKEND": "demo"})
-    if _mode == "demo" or hasattr(_active, "load_custom_graph"):
-        demo_graph.load_custom_graph(nodes, edges)
-    # If in cognodb mode and available, also load into CognoDB
-    if _mode == "cognodb" and _startup_error is None:
-        try:
-            # We can also populate cognodb with nodes/edges
-            pass
-        except Exception as exc:
-            log.warning("Failed to load into CognoDB, keeping in-memory copy: %s", exc)
+def cache_get_graph(audit_id: str) -> Optional[GraphHandle]:
+    with _GRAPH_CACHE_LOCK:
+        handle = _GRAPH_CACHE.get(audit_id)
+        if handle is not None:
+            _GRAPH_CACHE.move_to_end(audit_id)
+        return handle
+
+
+def cache_evict_graph(audit_id: str) -> None:
+    with _GRAPH_CACHE_LOCK:
+        _GRAPH_CACHE.pop(audit_id, None)
+
+
+def build_handle_from_json(audit_id: str, graph_json: str, truncated: bool = False) -> GraphHandle:
+    cached = cache_get_graph(audit_id)
+    if cached is not None:
+        return cached
+    handle = deserialize_graph(graph_json, audit_id=audit_id, truncated=truncated)
+    cache_put_graph(audit_id, handle)
+    return handle
+
+
+def load_assembled_graph(
+    nodes: list[dict[str, Any]],
+    edges: list[dict[str, Any]],
+    audit_id: Optional[str] = None,
+) -> GraphHandle:
+    """
+    Build an isolated GraphHandle. When audit_id is omitted (legacy unit calls),
+    updates the unscoped fallback handle without touching any persisted audit.
+    """
+    if audit_id is not None:
+        graph_json, truncated, _kept_nodes, _kept_edges = serialize_graph(nodes, edges)
+        handle = deserialize_graph(graph_json, audit_id=audit_id, truncated=truncated)
+        cache_put_graph(audit_id, handle)
+        return handle
+
+    return demo_graph.load_custom_graph(nodes, edges)
 
 
 def reset_graph_to_seed() -> None:
-    """Reset graph to the demo synthetic seed data."""
+    """Reset unscoped fallback graph to the demo synthetic seed data."""
     demo_graph.reset_to_demo()
 
 
-# --- Query surface ------------------------------------------------------------
+def _use_cognodb(graph: Optional[GraphHandle]) -> bool:
+    return graph is None and _backend_mode == "cognodb" and cognodb_graph is get_backend_driver()
 
 
-def health() -> dict:
-    backend = get_active_backend()
-    status = backend.health()
-    status["mode"] = _mode
-    if _startup_error:
+# --- Query surface (GraphHandle-threaded) -------------------------------------
+
+
+def health(graph: Optional[GraphHandle] = None) -> dict:
+    if _use_cognodb(graph):
+        status = cognodb_graph.health()
+    else:
+        status = demo_graph.health(graph=graph)
+    status["mode"] = _backend_mode if graph is None else "audit"
+    if _startup_error and graph is None:
         status["startup_warning"] = _startup_error
     return status
 
 
-def stats() -> dict:
-    return get_active_backend().stats()
+def stats(graph: Optional[GraphHandle] = None) -> dict:
+    if _use_cognodb(graph):
+        return cognodb_graph.stats()
+    return demo_graph.stats(graph=graph)
 
 
-def search(q: str = "", type_label: str = "", limit: int = 25) -> list[dict]:
-    return get_active_backend().search(q=q, type_label=type_label, limit=limit)
+def search(q: str = "", type_label: str = "", limit: int = 25, graph: Optional[GraphHandle] = None) -> list[dict]:
+    if _use_cognodb(graph):
+        return cognodb_graph.search(q=q, type_label=type_label, limit=limit)
+    return demo_graph.search(q=q, type_label=type_label, limit=limit, graph=graph)
 
 
-def get_component(node_id: str) -> dict | None:
-    return get_active_backend().get_component(node_id)
+def get_component(node_id: str, graph: Optional[GraphHandle] = None) -> dict | None:
+    if _use_cognodb(graph):
+        return cognodb_graph.get_component(node_id)
+    return demo_graph.get_component(node_id, graph=graph)
 
 
-def dependencies_bundle(node_id: str) -> dict:
-    backend = get_active_backend()
+def dependencies_bundle(node_id: str, graph: Optional[GraphHandle] = None) -> dict:
+    if _use_cognodb(graph):
+        return {
+            "component": cognodb_graph.get_component(node_id),
+            "dependencies": cognodb_graph.direct_dependencies(node_id),
+            "dependents": cognodb_graph.direct_dependents(node_id),
+        }
     return {
-        "component": backend.get_component(node_id),
-        "dependencies": backend.direct_dependencies(node_id),
-        "dependents": backend.direct_dependents(node_id),
+        "component": demo_graph.get_component(node_id, graph=graph),
+        "dependencies": demo_graph.direct_dependencies(node_id, graph=graph),
+        "dependents": demo_graph.direct_dependents(node_id, graph=graph),
     }
 
 
-def impact(node_id: str) -> dict:
-    return get_active_backend().impact(node_id)
+def impact(node_id: str, graph: Optional[GraphHandle] = None) -> dict:
+    if _use_cognodb(graph):
+        return cognodb_graph.impact(node_id)
+    return demo_graph.impact(node_id, graph=graph)
 
 
-def shortest_path(from_id: str, to_id: str) -> dict:
-    backend = get_active_backend()
-    result = backend.shortest_path(from_id, to_id)
-    result["from"] = backend.get_component(from_id)
-    result["to"] = backend.get_component(to_id)
+def shortest_path(from_id: str, to_id: str, graph: Optional[GraphHandle] = None) -> dict:
+    if _use_cognodb(graph):
+        result = cognodb_graph.shortest_path(from_id, to_id)
+        result["from"] = cognodb_graph.get_component(from_id)
+        result["to"] = cognodb_graph.get_component(to_id)
+        return result
+    result = demo_graph.shortest_path(from_id, to_id, graph=graph)
+    result["from"] = demo_graph.get_component(from_id, graph=graph)
+    result["to"] = demo_graph.get_component(to_id, graph=graph)
     return result
 
 
@@ -158,11 +209,14 @@ def _criticality_tier(total: int, components_total: int) -> dict:
     return {"tier": tier, "share": round(share, 3)}
 
 
-def criticality(node_id: str) -> dict:
-    backend = get_active_backend()
-    counts = backend.criticality_counts(node_id)
+def criticality(node_id: str, graph: Optional[GraphHandle] = None) -> dict:
+    if _use_cognodb(graph):
+        counts = cognodb_graph.criticality_counts(node_id)
+        components_total = len(cognodb_graph.ids())
+    else:
+        counts = demo_graph.criticality_counts(node_id, graph=graph)
+        components_total = len(demo_graph.ids(graph=graph))
     total = counts["direct"] + counts["indirect"]
-    components_total = len(backend.ids())
     scored = _criticality_tier(total, components_total)
     return {
         **counts,
@@ -172,10 +226,13 @@ def criticality(node_id: str) -> dict:
     }
 
 
-def leaderboard(limit: int = 10) -> list[dict]:
-    backend = get_active_backend()
-    rows = backend.leaderboard(limit)
-    components_total = len(backend.ids())
+def leaderboard(limit: int = 10, graph: Optional[GraphHandle] = None) -> list[dict]:
+    if _use_cognodb(graph):
+        rows = cognodb_graph.leaderboard(limit)
+        components_total = len(cognodb_graph.ids())
+    else:
+        rows = demo_graph.leaderboard(limit, graph=graph)
+        components_total = len(demo_graph.ids(graph=graph))
     for row in rows:
         row.update(_criticality_tier(row["reach"], components_total))
     return rows

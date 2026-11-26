@@ -25,5 +25,7 @@ test-results/
 playwright-report/
 blob-report/
 .cache/
+.data/
+*.egg-info/
 *.log
 

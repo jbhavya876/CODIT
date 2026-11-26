@@ -1,8 +1,6 @@
 """
 Graph Assembler: Transforms parsed manifests, AST import graphs, and tech signals
 into the unified property graph schema.
-
-Preserves all labels and relationship conventions from Dependency-Detective.
 """
 
 from __future__ import annotations
@@ -47,7 +45,6 @@ def assemble_graph(
             })
 
     # 1. Add internal Module nodes
-    # Check test files to identify which implementation modules have tests
     test_file_stems = set()
     for f in files:
         stem = Path(f.path).stem
@@ -86,7 +83,6 @@ def assemble_graph(
                 "dep_type": dep.dep_type,
             },
         )
-        # Link manifest file -> Library
         if dep.evidence_file in node_ids:
             edges.append({
                 "source_id": dep.evidence_file,
@@ -112,7 +108,6 @@ def assemble_graph(
         if sig.category in ("database", "cache"):
             db_node_ids.append(sig_id)
 
-        # Link evidencing file -> Tech node
         if sig.evidence_file in node_ids:
             edges.append({
                 "source_id": sig.evidence_file,
@@ -133,7 +128,6 @@ def assemble_graph(
                     "target_id": imp.resolved_path,
                 })
             elif not imp.is_relative and imp.source:
-                # Check if matches a known Library node
                 lib_id_npm = f"lib-npm-{imp.source.lower()}"
                 lib_id_pypi = f"lib-pypi-{imp.source.lower()}"
                 target_lib = lib_id_npm if lib_id_npm in node_ids else (lib_id_pypi if lib_id_pypi in node_ids else None)
@@ -144,7 +138,7 @@ def assemble_graph(
                         "target_id": target_lib,
                     })
 
-    # 5. Add Finding nodes and FLAGGED_BY relationships if findings are provided
+    # 5. Add Finding nodes and FLAGGED_BY relationships
     if findings:
         for f in findings:
             if isinstance(f, dict):
@@ -193,9 +187,11 @@ def load_and_activate_graph(
     tech_signals: List[TechStackSignal],
     ast_summaries: Dict[str, FileAstSummary],
     findings: Optional[List[Any]] = None,
+    audit_id: Optional[str] = None,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
-    Assembles and activates the codebase graph in the active graph engine.
+    Assemble the codebase graph and bind it to an isolated GraphHandle when
+    `audit_id` is supplied, or to the unscoped fallback handle for legacy unit calls.
     """
     nodes, edges = assemble_graph(
         files=files,
@@ -204,6 +200,6 @@ def load_and_activate_graph(
         ast_summaries=ast_summaries,
         findings=findings,
     )
-    graph_service.load_assembled_graph(nodes, edges)
-    log.info("Activated assembled graph: %d nodes, %d edges", len(nodes), len(edges))
+    graph_service.load_assembled_graph(nodes, edges, audit_id=audit_id)
+    log.info("Activated assembled graph (audit_id=%s): %d nodes, %d edges", audit_id, len(nodes), len(edges))
     return nodes, edges

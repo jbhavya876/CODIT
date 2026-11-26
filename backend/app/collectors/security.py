@@ -1,20 +1,21 @@
 """
 Security Audit Collector:
 1. OSV.dev vulnerability database lookups for declared dependency versions.
-2. Committed secrets and credentials scanning (detect-secrets heuristics).
+2. Committed secrets and credentials scanning (delegated to codit_core.secrets).
 """
 
 from __future__ import annotations
 
 import logging
-import re
-import uuid
-from typing import List, Optional
+from typing import List
 
 import httpx
 
-from backend.app.config import Config
+from codit_core.fingerprint import compute_fingerprint
+from codit_core.secrets import SECRET_PATTERNS, scan_text  # noqa: F401 - re-exported
+
 from backend.app.collectors.models import AuditFinding
+from backend.app.config import Config
 from backend.app.ingestion.models import FileEntry
 from backend.app.parsers.models import DependencyEntry
 
@@ -44,51 +45,6 @@ KNOWN_CVE_MAPPINGS = {
     },
 }
 
-SECRET_PATTERNS = [
-    (
-        r"(?:A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}",
-        "AWS Access Key ID",
-        "critical",
-        "AWS_KEY",
-    ),
-    (
-        r"-----BEGIN (?:RSA|OPENSSH|DSA|EC|PGP) PRIVATE KEY-----",
-        "Unencrypted Private Key",
-        "critical",
-        "PRIVATE_KEY",
-    ),
-    (
-        r"(?:sk|rk)_(?:live|test)_[0-9a-zA-Z]{24,32}",
-        "Stripe Secret Key",
-        "critical",
-        "STRIPE_SECRET",
-    ),
-    (
-        r"gh[pousr]_[0-9a-zA-Z]{36,40}",
-        "GitHub Personal Access Token",
-        "critical",
-        "GITHUB_TOKEN",
-    ),
-    (
-        r"xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,32}",
-        "Slack API Token",
-        "high",
-        "SLACK_TOKEN",
-    ),
-    (
-        r"(?:api[_-]?key|secret[_-]?key|auth[_-]?token)\s*[:=]\s*['\"][0-9a-zA-Z\-_]{20,}['\"]",
-        "Hardcoded Generic API Secret",
-        "high",
-        "GENERIC_SECRET",
-    ),
-    (
-        r"(?:password|passwd|pwd)\s*[:=]\s*['\"][^'\"]{8,}['\"]",
-        "Hardcoded Password Assignment",
-        "high",
-        "HARDCODED_PASSWORD",
-    ),
-]
-
 
 def check_osv_vulnerability(dep: DependencyEntry, client: httpx.Client) -> List[AuditFinding]:
     """Queries OSV.dev public API for a single dependency version."""
@@ -98,6 +54,7 @@ def check_osv_vulnerability(dep: DependencyEntry, client: httpx.Client) -> List[
     # Check offline knowledge base first for speed & offline test reliability
     if dep_key in KNOWN_CVE_MAPPINGS:
         info = KNOWN_CVE_MAPPINGS[dep_key]
+        fp = compute_fingerprint(info["id"], dep.evidence_file, f"{dep.ecosystem}:{dep.name}@{dep.normalized_version}")
         findings.append(AuditFinding(
             id=f"vuln-{dep.name}-{info['id']}",
             dimension="security",
@@ -109,6 +66,8 @@ def check_osv_vulnerability(dep: DependencyEntry, client: httpx.Client) -> List[
             rule_id=info["id"],
             remediation=f"Upgrade {dep.name} to the latest patched release.",
             component_id=f"lib-{dep.ecosystem.lower()}-{dep.name.lower()}",
+            fingerprint=fp,
+            basis="PATTERN",
         ))
         return findings
 
@@ -138,6 +97,7 @@ def check_osv_vulnerability(dep: DependencyEntry, client: httpx.Client) -> List[
                 elif "MODERATE" in cvss.upper() or "MEDIUM" in cvss.upper():
                     severity = "medium"
 
+                fp = compute_fingerprint(cve_id, dep.evidence_file, f"{dep.ecosystem}:{dep.name}@{dep.normalized_version}")
                 findings.append(AuditFinding(
                     id=f"vuln-{dep.name}-{cve_id}",
                     dimension="security",
@@ -149,6 +109,8 @@ def check_osv_vulnerability(dep: DependencyEntry, client: httpx.Client) -> List[
                     rule_id=cve_id,
                     remediation=f"Upgrade {dep.name} to a safe version.",
                     component_id=f"lib-{dep.ecosystem.lower()}-{dep.name.lower()}",
+                    fingerprint=fp,
+                    basis="PATTERN",
                 ))
     except Exception as exc:
         log.debug("OSV lookup error for %s: %s", dep.name, exc)
@@ -157,37 +119,29 @@ def check_osv_vulnerability(dep: DependencyEntry, client: httpx.Client) -> List[
 
 
 def scan_for_committed_secrets(files: List[FileEntry]) -> List[AuditFinding]:
-    """Scans all repository files for hardcoded secrets and credentials."""
+    """Scans all repository files for hardcoded secrets and credentials via codit_core."""
     findings: List[AuditFinding] = []
 
     for entry in files:
         if not entry.content:
             continue
-
-        # Skip example or test fixture templates unless they contain real secret tokens
-        lines = entry.content.splitlines()
-        for line_idx, line in enumerate(lines, 1):
-            line_str = line.strip()
-            # Skip example or template documentation placeholders
-            if entry.path.endswith(".example") or ".template" in entry.path.lower():
-                if "replace-me" in line_str.lower() or "your_" in line_str.lower() or "placeholder" in line_str.lower():
-                    continue
-
-            for pattern, secret_type, severity, rule_id in SECRET_PATTERNS:
-                match = re.search(pattern, line)
-                if match:
-                    findings.append(AuditFinding(
-                        id=f"secret-{uuid.uuid4().hex[:8]}",
-                        dimension="security",
-                        severity=severity,
-                        confidence="high",
-                        description=f"Potential leaked {secret_type} detected in committed code.",
-                        evidence_file=entry.path,
-                        evidence_line=line_idx,
-                        rule_id=f"SECRET_{rule_id}",
-                        remediation="Immediately revoke the credential, remove it from git history, and load it from environment variables.",
-                        component_id=entry.path,
-                    ))
+        for match in scan_text(entry.path, entry.content):
+            fp = compute_fingerprint(match.rule_id, entry.path, secret_hash=match.secret_hash)
+            findings.append(AuditFinding(
+                id=f"secret-{fp[:8]}-{match.line}",
+                dimension="security",
+                severity=match.severity,
+                confidence="high",
+                description=f"Potential leaked {match.secret_type} detected in committed code.",
+                evidence_file=entry.path,
+                evidence_line=match.line,
+                rule_id=match.rule_id,
+                remediation="Immediately revoke the credential, remove it from git history, and load it from environment variables.",
+                component_id=entry.path,
+                fingerprint=fp,
+                basis="PATTERN",
+                params={"kind": match.kind, "secret_hash_prefix": match.secret_hash[:12]},
+            ))
 
     return findings
 

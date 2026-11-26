@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codit-core"
+version = "3.0.0"
+description = "Pure static analysis core shared between CODIT server and codit-guard CLI"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0",
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

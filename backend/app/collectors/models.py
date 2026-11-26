@@ -4,14 +4,14 @@ Data models for audit findings emitted by collectors.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional
 
 
 @dataclass
 class AuditFinding:
     id: str
-    dimension: str      # "security", "tests", "duplication", "scalability", "maintainability"
+    dimension: str      # "security", "tests", "duplication", "scalability", "maintainability", "agent_integrity", "licenses"
     severity: str       # "critical", "high", "medium", "low", "info"
     confidence: str     # "high", "medium", "low"
     description: str
@@ -20,3 +20,7 @@ class AuditFinding:
     rule_id: str = ""
     remediation: str = ""
     component_id: Optional[str] = None
+    fingerprint: str = ""
+    basis: str = "AST PROOF"
+    commit_sha: Optional[str] = None
+    params: Dict[str, Any] = field(default_factory=dict)

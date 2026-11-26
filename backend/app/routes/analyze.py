@@ -1,35 +1,17 @@
 """
-Analysis execution route: orchestrates the full pipeline from ingestion manifest
-to graph assembly, collectors, scoring, diagrams, and roadmap synthesis.
+Analysis execution route: orchestrates the audit pipeline against an isolated
+per-audit record and GraphHandle via `audit_service`.
 """
 
 from __future__ import annotations
 
 import logging
-import time
-import uuid
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from backend.app.collectors import run_all_collectors
-from backend.app.delivery.models import AuditReport
-from backend.app.diagrams.mermaid_generator import (
-    generate_architecture_diagram,
-    generate_blast_radius_diagram,
-)
-from backend.app.graph.assembler import assemble_graph, load_and_activate_graph
-from backend.app.ingestion.zip_extract import purge_extracted_files
-from backend.app.parsers.ast.treesitter_walker import parse_codebase_ast
-from backend.app.parsers.manifest import extract_manifests_and_signals
-from backend.app.state import get_active_codebase, get_active_report, set_active_report
-from backend.app.ml.onnx_scorer import run_onnx_inference
-from backend.app.ml.explainability import compute_shap_score_attributions
-from backend.app.scoring.roadmap_synthesis import generate_audit_roadmap
-from backend.app.scoring.rules_engine import score_audit
-from backend.app.services import graph_service
+from backend.app.services import audit_service
 
 log = logging.getLogger(__name__)
 
@@ -41,117 +23,78 @@ class AnalyzeRequest(BaseModel):
 
 
 @router.post("/run")
-def run_full_analysis(payload: AnalyzeRequest = AnalyzeRequest()):
-    global _ACTIVE_REPORT
+def run_full_analysis(
+    request: Request,
+    response: Response,
+    payload: AnalyzeRequest = AnalyzeRequest(),
+):
+    audit_id = audit_service.get_audit_id_from_request(request)
+    staged = audit_service.get_staged_codebase(audit_id) if audit_id else None
 
-    codebase = get_active_codebase()
-    entries = codebase.get("entries", [])
-    target_type = codebase.get("type", "demo")
-    target_name = codebase.get("target", "Demo System")
+    if audit_id and staged is None:
+        # Check if this audit already ran (re-run or demo)
+        existing_row = audit_service.get_audit_row(audit_id)
+        if existing_row is not None and existing_row.source_kind != "demo" and existing_row.status != "completed":
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "no_codebase", "message": "No active codebase found. Ingest via /api/ingest first."},
+            )
+        if existing_row is not None and existing_row.status == "completed":
+            existing_report = audit_service.get_report_for_audit(audit_id)
+            if existing_report is not None:
+                return {
+                    "status": "ok",
+                    "audit_id": audit_id,
+                    "report_id": existing_report.report_id,
+                    "score": existing_report.scorecard.overall_score,
+                    "phase": existing_report.scorecard.phase,
+                    "findings_count": len(existing_report.findings),
+                    "source_deleted": existing_report.source_deleted,
+                    "onnx_fragility": existing_report.ml_insights.get("onnx_metrics", {}).get("fragility_score"),
+                    "shap_baseline": existing_report.ml_insights.get("shap_explainability", {}).get("baseline_score"),
+                }
 
-    # If no files ingested yet, assemble from demo or return error
+    if staged is not None:
+        entries = staged.get("entries", [])
+        target_type = staged.get("type", "demo")
+        target_name = staged.get("target", "Demo System")
+        temp_dir = staged.get("temp_dir")
+    else:
+        audit_id = audit_service.create_audit(source_kind="demo", source_ref="Demo System", status="queued")
+        entries = []
+        target_type = "demo"
+        target_name = "Demo System"
+        temp_dir = None
+
     if not entries and target_type != "demo":
         raise HTTPException(
             status_code=400,
             detail={"code": "no_codebase", "message": "No active codebase found. Ingest via /api/ingest first."},
         )
 
-    # 1. Parse manifests & config signals (Module 2)
-    deps, signals = extract_manifests_and_signals(entries)
-
-    # 2. Parse source ASTs & internal imports (Module 3)
-    ast_map = parse_codebase_ast(entries)
-
-    # 3. Run audit collectors (Module 5)
-    findings = run_all_collectors(entries, deps, ast_map)
-
-    # 4. Deterministic scoring (Module 6a)
-    scorecard = score_audit(findings)
-
-    # 5. Graph Assembly & activation (Module 4)
-    if target_type == "demo" and not entries:
-        graph_service.reset_graph_to_seed()
-        from database import seed_data
-        nodes = []
-        for nid, lbl in seed_data.LABELS.items():
-            props = dict(seed_data.ALL_PROPERTIES.get(nid, {}))
-            props["id"] = nid
-            props["type"] = lbl
-            props["labels"] = lbl
-            nodes.append(props)
-        edges = [
-            {"source_id": src, "rel_type": rtype, "target_id": dst}
-            for src, rtype, dst in seed_data.RELATIONSHIPS
-        ]
-    else:
-        nodes, edges = load_and_activate_graph(entries, deps, signals, ast_map, findings)
-
-    # 6. Generate Mermaid architecture diagram (Module 7)
-    arch_diagram = generate_architecture_diagram(nodes, edges)
-
-    # 7. Query criticality leaderboard from active graph (Module 4)
-    leaderboard = graph_service.leaderboard(limit=8)
-
-    # 8. Synthesize prioritized roadmap (Module 6b)
-    roadmap = generate_audit_roadmap(
-        scorecard=scorecard,
-        findings=findings,
-        critical_components=leaderboard,
-        goal=payload.goal or "production",
-    )
-
-    # 9. Access tier resolution
-    tier_map = {
-        "public": "free_public",
-        "private": "paid_private",
-        "zip": "premium_zip",
-        "demo": "free_public",
-    }
-    access_tier = tier_map.get(target_type, "free_public")
-
-    # 10. Run Explainable AI (SHAP) and ONNX Defect / Fragility Inference
-    graph_stats = graph_service.stats()
-    onnx_metrics = run_onnx_inference(entries, findings, graph_stats)
-    shap_explainability = compute_shap_score_attributions(scorecard, findings, entries, graph_stats)
-    ml_insights = {
-        "onnx_metrics": onnx_metrics,
-        "shap_explainability": shap_explainability,
-    }
-
-    # 11. Check Constraint 7: Immediate deletion of ZIP-uploaded source code
-    source_deleted = False
-    temp_dir = codebase.get("temp_dir")
-    if target_type == "zip":
-        if temp_dir and Path(temp_dir).exists():
-            purge_extracted_files(Path(temp_dir))
-            log.info("Constraint 7 enforced: Purged ZIP source files from %s post-analysis", temp_dir)
-        source_deleted = True
-
-    # 12. Compile canonical AuditReport
-    report = AuditReport(
-        report_id=f"audit-{uuid.uuid4().hex[:8]}",
+    assert audit_id is not None
+    report = audit_service.run_audit_pipeline(
+        audit_id=audit_id,
+        entries=entries,
         target_name=target_name,
         target_type=target_type,
-        access_tier=access_tier,
-        created_at=time.time(),
-        scorecard=scorecard,
-        findings=findings,
-        roadmap=roadmap,
-        architecture_diagram_mermaid=arch_diagram,
-        criticality_leaderboard=leaderboard,
-        stats=graph_stats,
-        source_deleted=source_deleted,
-        ml_insights=ml_insights,
+        goal=payload.goal or "production",
+        temp_dir=temp_dir,
     )
 
-    set_active_report(report)
+    if response is not None:
+        audit_service.set_audit_cookie(response, audit_id)
+
+    onnx_metrics = report.ml_insights.get("onnx_metrics", {})
+    shap_explainability = report.ml_insights.get("shap_explainability", {})
     return {
         "status": "ok",
+        "audit_id": audit_id,
         "report_id": report.report_id,
-        "score": scorecard.overall_score,
-        "phase": scorecard.phase,
-        "findings_count": len(findings),
-        "source_deleted": source_deleted,
+        "score": report.scorecard.overall_score,
+        "phase": report.scorecard.phase,
+        "findings_count": len(report.findings),
+        "source_deleted": report.source_deleted,
         "onnx_fragility": onnx_metrics.get("fragility_score"),
         "shap_baseline": shap_explainability.get("baseline_score"),
     }

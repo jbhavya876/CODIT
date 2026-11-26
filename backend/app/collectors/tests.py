@@ -6,9 +6,11 @@ Evaluates test file ratios, test framework configurations, and test suite health
 from __future__ import annotations
 
 import logging
-import uuid
 from pathlib import Path
 from typing import List, Set
+
+from codit_core.classify import is_test_file  # noqa: F401 - extracted to codit_core
+from codit_core.fingerprint import compute_fingerprint
 
 from backend.app.collectors.models import AuditFinding
 from backend.app.ingestion.models import FileEntry
@@ -32,19 +34,6 @@ TEST_FRAMEWORK_CONFIGS = {
 }
 
 CRITICAL_MODULE_KEYWORDS = {"auth", "payment", "crypto", "database", "order", "security", "token"}
-
-
-def is_test_file(path_str: str) -> bool:
-    p_lower = path_str.lower()
-    parts = Path(p_lower).parts
-    if any(part in ("tests", "test", "__tests__", "spec") for part in parts):
-        return True
-    name = Path(p_lower).name
-    if name.startswith("test_") or name.endswith("_test.py"):
-        return True
-    if ".test." in name or ".spec." in name:
-        return True
-    return False
 
 
 def run_tests_collector(files: List[FileEntry]) -> List[AuditFinding]:
@@ -81,8 +70,9 @@ def run_tests_collector(files: List[FileEntry]) -> List[AuditFinding]:
                 break
 
         if not has_test_script_in_manifest:
+            fp = compute_fingerprint("TEST_FRAMEWORK_MISSING", primary_manifest, "no_test_config")
             findings.append(AuditFinding(
-                id=f"test-no-config-{uuid.uuid4().hex[:6]}",
+                id=f"test-no-config-{fp[:8]}",
                 dimension="tests",
                 severity="medium",
                 confidence="high",
@@ -91,6 +81,8 @@ def run_tests_collector(files: List[FileEntry]) -> List[AuditFinding]:
                 evidence_line=1,
                 rule_id="TEST_FRAMEWORK_MISSING",
                 remediation="Configure a test framework runner (e.g. pytest or Vitest/Jest) and add test targets to CI.",
+                fingerprint=fp,
+                basis="AST PROOF",
             ))
 
     # 2. Check test file ratio
@@ -99,8 +91,9 @@ def run_tests_collector(files: List[FileEntry]) -> List[AuditFinding]:
     ratio = test_count / max(source_count, 1)
 
     if test_count == 0 and source_count > 0:
+        fp = compute_fingerprint("TEST_ZERO_COVERAGE", primary_manifest, "zero_test_files")
         findings.append(AuditFinding(
-            id=f"test-zero-coverage-{uuid.uuid4().hex[:6]}",
+            id=f"test-zero-coverage-{fp[:8]}",
             dimension="tests",
             severity="high",
             confidence="high",
@@ -109,10 +102,13 @@ def run_tests_collector(files: List[FileEntry]) -> List[AuditFinding]:
             evidence_line=1,
             rule_id="TEST_ZERO_COVERAGE",
             remediation="Establish a baseline unit test suite for critical application workflows.",
+            fingerprint=fp,
+            basis="AST PROOF",
         ))
     elif ratio < 0.20 and source_count >= 5:
+        fp = compute_fingerprint("TEST_LOW_RATIO", primary_manifest, "low_test_ratio")
         findings.append(AuditFinding(
-            id=f"test-low-ratio-{uuid.uuid4().hex[:6]}",
+            id=f"test-low-ratio-{fp[:8]}",
             dimension="tests",
             severity="medium",
             confidence="high",
@@ -121,10 +117,15 @@ def run_tests_collector(files: List[FileEntry]) -> List[AuditFinding]:
             evidence_line=1,
             rule_id="TEST_LOW_RATIO",
             remediation="Increase unit and integration test coverage to at least 1 test file per 3 production modules.",
+            fingerprint=fp,
+            basis="AST PROOF",
         ))
 
     # 3. Check for untested critical business logic modules
-    test_stems: Set[str] = {Path(t.path).stem.lower().replace("test_", "").replace("_test", "").replace(".test", "").replace(".spec", "") for t in test_files}
+    test_stems: Set[str] = {
+        Path(t.path).stem.lower().replace("test_", "").replace("_test", "").replace(".test", "").replace(".spec", "")
+        for t in test_files
+    }
 
     for sf in source_files:
         p_lower = sf.path.lower()
@@ -135,8 +136,9 @@ def run_tests_collector(files: List[FileEntry]) -> List[AuditFinding]:
         has_tests = stem in test_stems or any(stem in t for t in test_stems)
 
         if is_critical and not has_tests and sf.size > 200:
+            fp = compute_fingerprint("TEST_UNTESTED_CRITICAL", sf.path, fname)
             findings.append(AuditFinding(
-                id=f"test-untested-critical-{uuid.uuid4().hex[:6]}",
+                id=f"test-untested-critical-{fp[:8]}",
                 dimension="tests",
                 severity="medium",
                 confidence="medium",
@@ -146,6 +148,8 @@ def run_tests_collector(files: List[FileEntry]) -> List[AuditFinding]:
                 rule_id="TEST_UNTESTED_CRITICAL",
                 remediation=f"Add targeted unit tests for {sf.path} validating edge cases and failure scenarios.",
                 component_id=sf.path,
+                fingerprint=fp,
+                basis="GRAPH HEUR",
             ))
 
     return findings

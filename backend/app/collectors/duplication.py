@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import uuid
 from typing import Dict, List, Set, Tuple
+
+from codit_core.fingerprint import compute_fingerprint
 
 from backend.app.collectors.models import AuditFinding
 from backend.app.ingestion.models import FileEntry
@@ -61,14 +62,15 @@ def detect_code_duplication(files: List[FileEntry]) -> List[AuditFinding]:
             block_hash = hashlib.sha256(block_text.encode("utf-8")).hexdigest()
 
             if block_hash in seen_blocks:
-                orig_file, orig_line, snippet = seen_blocks[block_hash]
+                orig_file, orig_line, _snippet = seen_blocks[block_hash]
                 if orig_file != entry.path:
                     pair_key = tuple(sorted([orig_file, entry.path]))
                     if pair_key not in reported_pairs:
                         reported_pairs.add(pair_key)
                         current_line = i + 1
+                        fp = compute_fingerprint("CODE_DUPLICATION_BLOCK", entry.path, block_hash)
                         findings.append(AuditFinding(
-                            id=f"dup-{uuid.uuid4().hex[:6]}",
+                            id=f"dup-{fp[:8]}",
                             dimension="duplication",
                             severity="medium",
                             confidence="high",
@@ -81,6 +83,8 @@ def detect_code_duplication(files: List[FileEntry]) -> List[AuditFinding]:
                             rule_id="CODE_DUPLICATION_BLOCK",
                             remediation="Extract duplicated logic into a shared helper function or reusable component.",
                             component_id=entry.path,
+                            fingerprint=fp,
+                            basis="AST PROOF",
                         ))
             else:
                 seen_blocks[block_hash] = (entry.path, i + 1, block_text)

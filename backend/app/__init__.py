@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.app.config import Config
+from backend.app.db.engine import init_db
+from backend.app.jobs.runner import start_reaper, stop_reaper
 from backend.app.routes.api import router as core_api_router, ApiError
 from backend.app.services import graph_service
 from backend.app.services.graph_service import DatabaseUnavailable
@@ -25,12 +28,29 @@ log = logging.getLogger(__name__)
 FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    init_db()
+    start_reaper()
+    try:
+        yield
+    finally:
+        stop_reaper()
+
+
 def create_app(config_overrides: dict[str, Any] | None = None) -> FastAPI:
     app = FastAPI(
         title="Codebase Audit Platform API",
-        version="2.0.0",
+        version="3.0.0",
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
+        lifespan=_lifespan,
+    )
+
+    # Ensure DB schema is initialized even if TestClient is instantiated without lifespan entry
+    init_db(
+        database_url=(config_overrides or {}).get("DATABASE_URL"),
+        env=(config_overrides or {}).get("ENV"),
     )
 
     # Allow custom config overrides
