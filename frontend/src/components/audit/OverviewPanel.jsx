@@ -43,7 +43,7 @@ export default function OverviewPanel({
   const riskTier = onnxMetrics.defect_risk_tier || (overallScore >= 80 ? 'LOW' : overallScore >= 55 ? 'MODERATE' : 'CRITICAL')
 
   const copyText = (text, id) => {
-    navigator.clipboard?.writeText(text)
+    navigator.clipboard?.writeText(text)?.catch(() => {})
     setCopiedId(id)
     setTimeout(() => setCopiedId(null), 1800)
   }

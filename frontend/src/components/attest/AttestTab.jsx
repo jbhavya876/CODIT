@@ -27,7 +27,7 @@ export default function AttestTab({ auditStatus }) {
   const [copiedId, setCopiedId] = useState(null)
 
   const copyVal = (text, id) => {
-    navigator.clipboard?.writeText(text)
+    navigator.clipboard?.writeText(text)?.catch(() => {})
     setCopiedId(id)
     setTimeout(() => setCopiedId(null), 1600)
   }

@@ -77,7 +77,7 @@ export default function GraphPathInspector({ componentId, initialTab = 'deps', i
   }
 
   const handleCopyId = () => {
-    navigator.clipboard.writeText(currentId)
+    navigator.clipboard?.writeText(currentId)?.catch(() => {})
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }

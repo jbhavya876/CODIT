@@ -70,7 +70,7 @@ export default function MermaidViewer({ chart, code, className = '' }) {
   }, [diagramCode])
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(diagramCode)
+    navigator.clipboard?.writeText(diagramCode)?.catch(() => {})
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }

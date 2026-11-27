@@ -43,7 +43,7 @@ export default function GuardDrawer({ isOpen, onClose }) {
   if (!isOpen) return null
 
   const copySnippet = (text, id) => {
-    navigator.clipboard?.writeText(text)
+    navigator.clipboard?.writeText(text)?.catch(() => {})
     setCopiedId(id)
     setTimeout(() => setCopiedId(null), 1600)
   }

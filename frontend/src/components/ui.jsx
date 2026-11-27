@@ -165,7 +165,7 @@ export function EvidenceCitation({ file, line, ruleId, onInspect }) {
 
   const handleCopy = (e) => {
     e.stopPropagation()
-    navigator.clipboard.writeText(citation)
+    navigator.clipboard?.writeText(citation)?.catch(() => {})
     setCopied(true)
     setTimeout(() => setCopied(false), 1800)
   }

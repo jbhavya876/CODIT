@@ -27,6 +27,7 @@ async function runPivotUiSuite() {
 
   try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {})
     const page = await context.newPage()
     page.on('console', (m) => {
       if (m.type() === 'error') consoleErrors.push(m.text())
