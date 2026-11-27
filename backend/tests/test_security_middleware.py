@@ -244,3 +244,67 @@ class TestZipSizeValidation:
         )
         assert r.status_code == 400
         assert r.json()["error"]["code"] == "invalid_file"
+
+
+class TestPivotRateLimitGroupsAndVerifyCSP:
+    def test_audits_create_and_attest_and_admin_rate_limits(self, rl_client):
+        # audits create group: 4/min
+        ip_a = unique_ip()
+        h_a = {"X-Forwarded-For": ip_a}
+        for _ in range(4):
+            rl_client.post("/api/audits", json={"type": "public", "url": "--upload-pack=x"}, headers=h_a)
+        r_aud = rl_client.post("/api/audits", json={"type": "public", "url": "--upload-pack=x"}, headers=h_a)
+        assert r_aud.status_code == 429
+        assert r_aud.json()["error"]["code"] == "rate_limited"
+
+        # attest group: 6/min
+        ip_t = unique_ip()
+        h_t = {"X-Forwarded-For": ip_t}
+        for _ in range(6):
+            rl_client.post("/api/attest/challenge", json={"repo": "bad"}, headers=h_t)
+        r_att = rl_client.post("/api/attest/challenge", json={"repo": "bad"}, headers=h_t)
+        assert r_att.status_code == 429
+
+        # admin group: 10/min
+        ip_adm = unique_ip()
+        h_adm = {"X-Forwarded-For": ip_adm}
+        for _ in range(10):
+            rl_client.post("/api/admin/attest/att_fake/revoke", json={"reason_code": "owner_request"}, headers=h_adm)
+        r_adm = rl_client.post("/api/admin/attest/att_fake/revoke", json={"reason_code": "owner_request"}, headers=h_adm)
+        assert r_adm.status_code == 429
+
+        # public group: 120/min
+        ip_pub = unique_ip()
+        h_pub = {"X-Forwarded-For": ip_pub}
+        for _ in range(5):
+            r_pub = rl_client.get("/.well-known/codit-keys.json", headers=h_pub)
+            assert r_pub.status_code == 200
+
+    def test_verify_page_stricter_csp_than_spa(self, rl_off_client, monkeypatch):
+        import base64
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from backend.app.attest.service import issue_attestation
+        from backend.app.ingestion.models import FileEntry
+        from backend.app.services.audit_service import create_audit, run_audit_pipeline
+        import hashlib
+
+        priv = Ed25519PrivateKey.generate()
+        monkeypatch.setenv("ATTEST_SIGNING_KEY", base64.b64encode(priv.private_bytes_raw()).decode("ascii"))
+        monkeypatch.setenv("ATTEST_KEY_ID", "csp-test")
+
+        aid = create_audit("zip", "csp-check.zip", archive_sha256=hashlib.sha256(b"csp").hexdigest())
+        run_audit_pipeline(aid, [FileEntry("app.py", 6, "python", "x = 1\n")], "csp-check.zip", "zip")
+        att = issue_attestation(aid, consent_publish=True)
+
+        spa_resp = rl_off_client.get("/")
+        ver_resp = rl_off_client.get(att["verify_path"])
+        assert spa_resp.status_code == 200
+        assert ver_resp.status_code == 200
+
+        spa_csp = spa_resp.headers.get("content-security-policy", "")
+        ver_csp = ver_resp.headers.get("content-security-policy", "")
+        assert "script-src" in spa_csp
+        assert "default-src 'none'" in ver_csp
+        assert "script-src" not in ver_csp
+        assert "frame-ancestors 'none'" in ver_csp
+        assert ver_resp.headers.get("referrer-policy") == "no-referrer"

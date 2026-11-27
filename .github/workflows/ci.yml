@@ -1,0 +1,80 @@
+name: CODIT CI & Assurance Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  backend-and-guard-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c394e49354f0a8215b # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install backend and workspace packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pip-audit
+
+      - name: Run full pytest suite (backend + codit_core + codit_guard)
+        run: pytest backend/tests/ -q
+
+      - name: Dogfood codit-guard on pull requests
+        if: github.event_name == 'pull_request'
+        run: |
+          codit-guard check --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}" --offline --format sarif --output codit-guard.sarif
+
+      - name: Dependency vulnerability scan (report-only initially)
+        continue-on-error: true
+        run: pip-audit -r backend/requirements.txt
+
+  frontend-build-and-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c394e49354f0a8215b # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node 20
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install and build frontend
+        run: |
+          pip install -r backend/requirements.txt
+          npm --prefix frontend ci
+          npm --prefix frontend run build
+
+      - name: Install Playwright browsers and run accessibility + UI checks
+        run: |
+          npx --prefix frontend playwright install chromium
+          RATE_LIMIT_ENABLED=false uvicorn backend.app:create_app --factory --host 127.0.0.1 --port 8000 &
+          sleep 3
+          node frontend/test_pivot_ui.mjs
+          node frontend/test_routes_comprehensive.mjs
+
+      - name: Frontend dependency audit (report-only initially)
+        continue-on-error: true
+        run: npm --prefix frontend audit

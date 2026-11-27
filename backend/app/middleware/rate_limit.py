@@ -39,7 +39,15 @@ _PREFIX_TO_GROUP: list[tuple[str, str]] = [
 ]
 
 
-def _route_group(path: str) -> str:
+def _route_group(path: str, method: str = "GET") -> str:
+    if path == "/api/audits" and method.upper() == "POST":
+        return "audits"
+    if path == "/api/attest/challenge" or (path.startswith("/api/audits/") and path.endswith("/attest")):
+        return "attest"
+    if path.startswith("/api/admin/"):
+        return "admin"
+    if path.startswith(("/v/", "/badge/", "/.well-known/", "/rubric/", "/static/verify.css")):
+        return "public"
     for prefix, group in _PREFIX_TO_GROUP:
         if path.startswith(prefix):
             return group
@@ -66,12 +74,20 @@ def _get_limit(group: str) -> int:
         "ingest":  "10",
         "report":  "20",
         "general": "120",
+        "audits":  "4",
+        "attest":  "6",
+        "public":  "120",
+        "admin":   "10",
     }
     env_keys = {
         "analyze": "RATE_LIMIT_ANALYZE_RPM",
         "ingest":  "RATE_LIMIT_INGEST_RPM",
         "report":  "RATE_LIMIT_REPORT_RPM",
         "general": "RATE_LIMIT_GENERAL_RPM",
+        "audits":  "RATE_LIMIT_AUDITS_RPM",
+        "attest":  "RATE_LIMIT_ATTEST_RPM",
+        "public":  "RATE_LIMIT_PUBLIC_RPM",
+        "admin":   "RATE_LIMIT_ADMIN_RPM",
     }
     return int(_os.environ.get(env_keys[group], defaults[group]))
 
@@ -139,7 +155,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         ip = _client_ip(request)
-        group = _route_group(request.url.path)
+        group = _route_group(request.url.path, request.method)
         limit = _get_limit(group)
         now = time.monotonic()
         window_start = now - _WINDOW_SECONDS
