@@ -1,0 +1,45 @@
+# Data-driven SPDX license classification (Section P5)
+# Every identifier verified against `license_expression.get_spdx_licensing()`.
+
+classes:
+  permissive:
+    - MIT
+    - Apache-2.0
+    - BSD-2-Clause
+    - BSD-3-Clause
+    - ISC
+    - 0BSD
+    - Unlicense
+    - CC0-1.0
+    - Zlib
+    - PSF-2.0
+  weak_copyleft:
+    - LGPL-2.1-only
+    - LGPL-2.1-or-later
+    - LGPL-3.0-only
+    - LGPL-3.0-or-later
+    - MPL-2.0
+    - EPL-1.0
+    - EPL-2.0
+    - CDDL-1.0
+    - CDDL-1.1
+  strong_copyleft:
+    - GPL-2.0-only
+    - GPL-2.0-or-later
+    - GPL-3.0-only
+    - GPL-3.0-or-later
+  network_copyleft:
+    - AGPL-3.0-only
+    - AGPL-3.0-or-later
+    - SSPL-1.0
+  source_available:
+    - BUSL-1.1
+    - Elastic-2.0
+    - PolyForm-Noncommercial-1.0.0
+    - PolyForm-Small-Business-1.0.0
+
+prefixes:
+  source_available:
+    - PolyForm-
+  unknown:
+    - LicenseRef-

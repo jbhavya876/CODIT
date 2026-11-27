@@ -1,0 +1,14 @@
+# Conservative license compatibility matrix (P5 item 6)
+# Flags only explicit incompatibility pairs & strong/network copyleft in permissive/proprietary projects.
+
+incompatible_class_pairs:
+  permissive:
+    - strong_copyleft
+    - network_copyleft
+  proprietary:
+    - strong_copyleft
+    - network_copyleft
+
+incompatible_spdx_pairs:
+  - project: Apache-2.0
+    dependency: GPL-2.0-only

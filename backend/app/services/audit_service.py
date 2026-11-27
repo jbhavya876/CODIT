@@ -29,6 +29,7 @@ from fastapi import Request, Response
 from sqlalchemy import desc, select
 
 from backend.app.collectors import run_all_collectors
+from backend.app.collectors.licenses import run_licenses_collector
 from backend.app.collectors.models import AuditFinding
 from backend.app.config import Config
 from backend.app.db.engine import session_scope
@@ -405,7 +406,7 @@ def run_audit_pipeline(
         ast_map = parse_codebase_ast(entries)
         emit_event(audit_id, "parse", "parse_done", data={"ast_files": len(ast_map)})
 
-        # 3. Run collectors + merge persisted history findings (if any)
+        # 3. Run collectors + merge persisted history findings (if any) + licenses (P5)
         findings = run_all_collectors(entries, deps, ast_map)
         existing_row = get_audit_row(audit_id)
         if existing_row and existing_row.process_json:
@@ -429,6 +430,24 @@ def run_audit_pipeline(
                     )
                 )
         emit_event(audit_id, "collect", "collect_done", data={"findings_count": len(findings)})
+
+        emit_event(audit_id, "licenses", "licenses_started")
+        lic_findings, licenses_report, licenses_coverage = run_licenses_collector(
+            entries,
+            deps,
+            source_kind=target_type,
+            offline=(target_type == "demo"),
+        )
+        findings.extend(lic_findings)
+        emit_event(
+            audit_id,
+            "licenses",
+            "licenses_done",
+            data={
+                "resolved": licenses_coverage.get("resolved", 0),
+                "total": licenses_coverage.get("total", 0),
+            },
+        )
 
         # 4. Deterministic scoring (v1.0.0 in P0; v2.0.0 added in P6)
         scorecard = score_audit(findings)
@@ -529,10 +548,12 @@ def run_audit_pipeline(
                 row.status = "completed"
                 row.rubric_version = RUBRIC_VERSION
                 row.scorecard_json = scorecard_dict
+                row.licenses_json = licenses_report
                 row.graph_json = graph_json
                 row.staged_at = None
                 existing_cov = dict(row.coverage_json or {})
                 existing_cov["graph_truncated"] = graph_truncated
+                existing_cov["licenses"] = licenses_coverage
                 existing_cov.setdefault("files_total", len(entries))
                 existing_cov.setdefault("files_scanned", len(entries))
                 row.coverage_json = existing_cov
