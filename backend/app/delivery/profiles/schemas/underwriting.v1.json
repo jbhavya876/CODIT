@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coditt.xyz/schemas/underwriting.v1.json",
+  "title": "CODIT Underwriting Export v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "rubric_version",
+    "engine_version",
+    "subject_kind",
+    "commit",
+    "archive_sha256",
+    "coverage",
+    "scores",
+    "flags",
+    "counts",
+    "attestation_id"
+  ],
+  "properties": {
+    "schema": {"type": "string", "const": "codit.underwriting.v1"},
+    "generated_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T.*Z$"},
+    "rubric_version": {"type": "string", "minLength": 1},
+    "engine_version": {"type": "string", "minLength": 1},
+    "subject_kind": {"type": "string", "enum": ["git", "archive"]},
+    "commit": {"type": ["string", "null"], "pattern": "^[0-9a-fA-F]{40}$"},
+    "archive_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$"},
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files_scanned", "files_total", "history_assessed", "commits_analyzed", "licenses_resolved_pct"],
+      "properties": {
+        "files_scanned": {"type": "integer", "minimum": 0},
+        "files_total": {"type": "integer", "minimum": 0},
+        "history_assessed": {"type": "boolean"},
+        "commits_analyzed": {"type": "integer", "minimum": 0},
+        "licenses_resolved_pct": {"type": ["integer", "null"], "minimum": 0, "maximum": 100}
+      }
+    },
+    "scores": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["overall", "phase", "dimensions"],
+      "properties": {
+        "overall": {"type": "integer", "minimum": 0, "maximum": 100},
+        "phase": {"type": "string", "enum": ["Prototype", "MVP", "Production-track"]},
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["security", "tests", "agent_integrity", "scalability", "licenses", "duplication", "maintainability"],
+          "properties": {
+            "security": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
+            "tests": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
+            "agent_integrity": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
+            "scalability": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
+            "licenses": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
+            "duplication": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
+            "maintainability": {"type": ["integer", "null"], "minimum": 0, "maximum": 100}
+          }
+        }
+      }
+    },
+    "flags": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "secret_at_head",
+        "secret_in_history",
+        "critical_vulnerability",
+        "copyleft_conflict",
+        "test_integrity_event_90d",
+        "agent_declared_fraction_bucket"
+      ],
+      "properties": {
+        "secret_at_head": {"type": "boolean"},
+        "secret_in_history": {"type": "boolean"},
+        "critical_vulnerability": {"type": "boolean"},
+        "copyleft_conflict": {"type": "boolean"},
+        "test_integrity_event_90d": {"type": "boolean"},
+        "agent_declared_fraction_bucket": {
+          "type": "string",
+          "enum": ["none", "low", "medium", "high", "not_assessed"]
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["critical", "high", "medium", "low", "info"],
+      "properties": {
+        "critical": {"type": "integer", "minimum": 0},
+        "high": {"type": "integer", "minimum": 0},
+        "medium": {"type": "integer", "minimum": 0},
+        "low": {"type": "integer", "minimum": 0},
+        "info": {"type": "integer", "minimum": 0}
+      }
+    },
+    "attestation_id": {"type": ["string", "null"], "pattern": "^att_[A-Za-z0-9_-]+$"}
+  }
+}

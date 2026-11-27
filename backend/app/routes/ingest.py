@@ -190,10 +190,16 @@ async def ingest_zip_upload(
     git_temp_dir = Path(tempfile.mkdtemp(prefix="audit_zip_git_"))
 
     try:
+        import hashlib as _hashlib
+
         entries = extract_zip(content, temp_dir)
         audit_id, summary = audit_service.create_staged_audit(
             file.filename, "zip", entries, temp_dir=temp_dir
         )
+        with audit_service.session_scope() as _sess:
+            _arow = _sess.get(audit_service.AuditRow, audit_id)
+            if _arow is not None:
+                _arow.source_archive_sha256 = _hashlib.sha256(content).hexdigest()
 
         hist_opts = HistoryOptions(
             enabled=history_enabled,

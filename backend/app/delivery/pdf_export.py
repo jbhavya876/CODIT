@@ -128,6 +128,7 @@ def generate_html_report(report: AuditReport) -> str:
 <html>
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:;">
 <title>Audit Report - {html.escape(report.target_name)}</title>
 <style>
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0b0f19; color: #f1f5f9; margin: 0; padding: 40px; line-height: 1.5; }}
@@ -143,7 +144,7 @@ def generate_html_report(report: AuditReport) -> str:
 </head>
 <body>
   <h1>Codebase Production-Readiness & Security Audit</h1>
-  <p>Target: <strong>{html.escape(report.target_name)}</strong> | Tier: {report.access_tier} | Score: <strong>{scorecard.overall_score}/100</strong> | Phase: <span class="badge phase-badge">{scorecard.phase}</span></p>
+  <p>Target: <strong>{html.escape(report.target_name)}</strong> | Tier: {html.escape(report.access_tier)} | Score: <strong>{scorecard.overall_score}/100</strong> | Phase: <span class="badge phase-badge">{html.escape(scorecard.phase)}</span></p>
   
   <div class="card">
     <h3>Executive Summary</h3>

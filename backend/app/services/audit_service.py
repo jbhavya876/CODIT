@@ -26,14 +26,14 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import Request, Response
-from sqlalchemy import desc, select
+from sqlalchemy import desc, select, update
 
 from backend.app.collectors import run_all_collectors
 from backend.app.collectors.licenses import run_licenses_collector
 from backend.app.collectors.models import AuditFinding
 from backend.app.config import Config
 from backend.app.db.engine import session_scope
-from backend.app.db.models import AuditEventRow, AuditRow, FindingRow
+from backend.app.db.models import AttestationRow, AuditEventRow, AuditRow, FindingRow
 from backend.app.delivery.models import AuditReport
 from backend.app.diagrams.mermaid_generator import generate_architecture_diagram
 from backend.app.graph.assembler import assemble_graph
@@ -204,6 +204,7 @@ def create_audit(
     *,
     options: Optional[Dict[str, Any]] = None,
     status: str = "queued",
+    archive_sha256: Optional[str] = None,
 ) -> str:
     audit_id = generate_audit_id()
     now = _utcnow()
@@ -217,12 +218,30 @@ def create_audit(
                 status=status,
                 source_kind=source_kind,
                 source_ref=source_ref[:256],
+                source_archive_sha256=archive_sha256,
                 options_json=options or {},
                 rubric_version=RUBRIC_VERSION,
                 engine_version=ENGINE_VERSION,
             )
         )
     return audit_id
+
+
+def delete_audit(audit_id: str) -> bool:
+    """Immediately delete an audit record, cascading findings/events and purging caches."""
+    if not audit_id:
+        return False
+    purge_staging(audit_id)
+    graph_service.cache_evict_graph(audit_id)
+    with session_scope() as session:
+        row = session.get(AuditRow, audit_id)
+        if row is None:
+            return False
+        session.execute(
+            update(AttestationRow).where(AttestationRow.audit_id == audit_id).values(audit_id=None)
+        )
+        session.delete(row)
+        return True
 
 
 def create_staged_audit(
