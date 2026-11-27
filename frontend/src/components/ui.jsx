@@ -107,19 +107,34 @@ export function CritBadge({ tier, size = 'sm' }) {
   )
 }
 
-/** 3-pip decoupled confidence metrology gauge */
-export function ConfidenceGauge({ level = 'high', label = true }) {
+/** 3-pip decoupled confidence metrology gauge (`AST PROOF`, `HISTORY PROOF`, `GRAPH HEUR`, `PATTERN`, `ESTIMATE`) */
+export function ConfidenceGauge({ level = 'high', basis = '', label = true }) {
   const norm = (level || 'high').toLowerCase()
+  const normBasis = (basis || '').toUpperCase().trim()
+
   let pips = 3
+  let badgeText = 'AST PROOF'
   let title = 'Deterministic AST Proof (Tree-sitter syntactic node verification)'
   let color = 'text-emerald-400'
 
-  if (norm === 'medium' || norm === 'med' || norm === 'heuristic') {
+  if (normBasis === 'HISTORY PROOF') {
+    pips = norm === 'high' ? 3 : norm === 'medium' ? 2 : 1
+    badgeText = 'HISTORY PROOF'
+    title = 'Deterministic verification from git commit and blob object history'
+    color = pips === 3 ? 'text-emerald-400' : pips === 2 ? 'text-amber-400' : 'text-slate-400'
+  } else if (normBasis === 'PATTERN') {
+    pips = norm === 'high' ? 2 : 1
+    badgeText = 'PATTERN'
+    title = 'Deterministic structural, secret, or license pattern match'
+    color = 'text-amber-400'
+  } else if (normBasis === 'GRAPH HEUR' || norm === 'medium' || norm === 'med' || norm === 'heuristic') {
     pips = 2
+    badgeText = 'GRAPH HEUR'
     title = 'Graph Traversal Inference (Multi-hop reach & topological heuristic)'
     color = 'text-amber-400'
-  } else if (norm === 'low' || norm === 'statistical' || norm === 'est') {
+  } else if (normBasis === 'ESTIMATE' || norm === 'low' || norm === 'statistical' || norm === 'est') {
     pips = 1
+    badgeText = 'ESTIMATE'
     title = 'Statistical Estimation (ONNX fragility pattern correlation)'
     color = 'text-slate-400'
   }
@@ -136,7 +151,7 @@ export function ConfidenceGauge({ level = 'high', label = true }) {
       </span>
       {label && (
         <span className="text-[10px] text-slate-400 uppercase tracking-wider">
-          {pips === 3 ? 'AST PROOF' : pips === 2 ? 'GRAPH HEUR' : 'ESTIMATE'}
+          {badgeText}
         </span>
       )}
     </span>

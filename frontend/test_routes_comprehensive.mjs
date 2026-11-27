@@ -69,7 +69,7 @@ async function runRegressionSuite() {
   // Route 4: Ingest Page #/ingest
   await test('Ingest Page #/ingest renders intake pipeline & presets', async (p) => {
     await p.goto(`${BASE_URL}/#/ingest`, { waitUntil: 'networkidle' })
-    await p.waitForSelector('text=Module 1 · Multi-Tier Codebase Ingestion', { timeout: 10000 })
+    await p.waitForSelector('text=Static Source & Git History Intake', { timeout: 10000 })
     await p.waitForSelector('text=QUICK INGEST PRESETS', { timeout: 10000 })
     await p.waitForSelector('button:has-text("Public GitHub Repo")', { timeout: 10000 })
     await p.waitForSelector('button:has-text("ZIP Archive Upload")', { timeout: 10000 })

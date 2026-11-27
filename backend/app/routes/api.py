@@ -12,6 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
+from backend.app.config import Config
 from backend.app.services import audit_service, graph_service
 from backend.app.services.demo_graph import GraphHandle
 from backend.app.services.graph_service import DatabaseUnavailable
@@ -57,7 +58,18 @@ def parse_limit(raw: Optional[int], default: int) -> int:
 def health(request: Request):
     try:
         graph = _resolve_graph(request)
-        return graph_service.health(graph=graph)
+        base = graph_service.health(graph=graph)
+        base["runtime_posture"] = {
+            "lines_executed": 0,
+            "zip_guards_active": True,
+            "sandbox_isolated": False,
+            "execution_mode": "static_analysis_only",
+            "walltime_seconds": Config.SANDBOX_WALLTIME_SECONDS,
+            "memory_limit_mb": Config.SANDBOX_MEMORY_LIMIT_MB,
+            "source_retention_seconds": 0,
+            "results_retention_hours": Config.AUDIT_RETENTION_HOURS,
+        }
+        return base
     except DatabaseUnavailable as exc:
         return JSONResponse(
             status_code=503,

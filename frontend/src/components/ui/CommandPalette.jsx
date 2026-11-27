@@ -6,7 +6,7 @@ import { href, navigate } from '../../router.js'
  * Command Palette (Cmd/Ctrl + K)
  * Keyboard-first navigation for security engineers, auditors, and developers.
  */
-export default function CommandPalette({ isOpen, onClose, findings = [], components = [] }) {
+export default function CommandPalette({ isOpen, onClose, findings = [], components = [], onOpenGuard = null }) {
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef(null)
@@ -22,6 +22,11 @@ export default function CommandPalette({ isOpen, onClose, findings = [], compone
   // Build searchable items
   const baseActions = [
     { id: 'nav-audit', title: 'Go to Audit Cockpit', group: 'Navigation', icon: Compass, action: () => navigate(href.audit()) },
+    { id: 'nav-process', title: 'Open Process Integrity Tab', group: 'Cockpit Tabs', icon: Terminal, action: () => navigate(href.auditTab('process')) },
+    { id: 'nav-licenses', title: 'Open Licenses & IP Tab', group: 'Cockpit Tabs', icon: FileCode, action: () => navigate(href.auditTab('licenses')) },
+    { id: 'nav-reports', title: 'Switch Report Profile (Technical / Diligence / Executive / Underwriting)', group: 'Cockpit Tabs', icon: FileCode, action: () => navigate(href.auditTab('reports')) },
+    { id: 'nav-attest', title: 'Start Public Attestation', group: 'Cockpit Tabs', icon: ShieldAlert, action: () => navigate(href.auditTab('attest')) },
+    ...(onOpenGuard ? [{ id: 'open-guard', title: 'Open Guard CLI Setup Drawer', group: 'Guard', icon: Terminal, action: () => onOpenGuard() }] : []),
     { id: 'nav-ingest', title: 'Ingest Repository (Public, Token, ZIP)', group: 'Navigation', icon: Terminal, action: () => navigate(href.ingest()) },
     { id: 'nav-export-md', title: 'Download Audit Report (Markdown)', group: 'Export', icon: FileCode, action: () => window.open('/api/report/markdown', '_blank') },
     { id: 'nav-export-html', title: 'Download Standalone Audit Report (HTML/PDF)', group: 'Export', icon: FileCode, action: () => window.open('/api/report/html', '_blank') },

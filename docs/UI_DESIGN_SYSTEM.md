@@ -53,7 +53,9 @@ To comply with **WCAG 2.2 AA non-text contrast** and ensure 100% legibility unde
 
 Confidence measures deterministic verification certainty and is strictly decoupled from severity:
 - `[●●●] AST PROOF`: Tree-sitter syntactic node verification (deterministic).
+- `[●●●] HISTORY PROOF`: Deterministic verification from git object history (`AGT-*`, `GRD-*`).
 - `[●●○] GRAPH HEUR`: Multi-hop openCypher graph reach heuristic.
+- `[●●○] PATTERN`: Deterministic structural/secret/license pattern match (`SEC-*`, `LIC-*`).
 - `[●○○] ESTIMATE`: Statistical ONNX model fragility correlation.
 
 ---
@@ -79,7 +81,7 @@ Self-hosted via `@fontsource` (zero runtime CDN dependencies):
 5. **SHAP Ledger (`SHAPLedger.jsx`)**: Double-entry accounting waterfall ledger showing exact marginal contributions from baseline to final score.
 6. **Evidenced Findings Ledger (`AuditPage.jsx`)**: High-density tabular layout with AST code citations, expandable syntax peeks, and 1-click clipboard copy.
 7. **Dossier Paper Mode**: Instant viewport transition into archival paper layout with print CSS for executive export.
-8. **Trust & Safety Strip (`TrustStrip.jsx`)**: Persistent indicator verifying `0 lines executed · Zip guards active · Ephemeral sandbox · Retention: 0s`.
+8. **Trust & Safety Strip (`TrustStrip.jsx`)**: Persistent indicator generated from real runtime configuration via `/api/health`: `0 lines executed · Zip guards active · Static analysis only (time & memory limits) · Source retention: 0s · Results kept 24h`.
 9. **Command Palette (`CommandPalette.jsx`)**: Universal `Cmd/Ctrl + K` fuzzy search dialog for instant keyboard-first navigation.
 
 ---

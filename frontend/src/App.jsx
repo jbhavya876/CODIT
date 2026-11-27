@@ -7,6 +7,7 @@ import DesignSystem from './pages/DesignSystem.jsx'
 import { usePeraWallet } from './wallet.js'
 import X402VerificationModal from './components/X402VerificationModal.jsx'
 import CommandPalette from './components/ui/CommandPalette.jsx'
+import GuardDrawer from './components/ui/GuardDrawer.jsx'
 import TrustStrip from './components/ui/TrustStrip.jsx'
 import { Command, Shield } from 'lucide-react'
 
@@ -29,7 +30,7 @@ function Logo() {
             v3.0
           </span>
         </div>
-        <div className="font-mono text-[9px] text-slate-500 tracking-wider uppercase">
+        <div className="font-mono text-[9px] text-slate-400 tracking-wider uppercase">
           Forensic Codebase Oracle
         </div>
       </div>
@@ -73,7 +74,7 @@ function CodebaseTargetPill() {
   if (!data?.active_target || data.active_target === 'demo') {
     return (
       <span className="hidden sm:inline-flex items-center gap-1.5 rounded border border-[#2A2E35] bg-[#15171B] px-2 py-0.5 font-mono text-[10px] text-slate-400">
-        <span className="text-slate-500">TARGET:</span> DEMO SYSTEM
+        <span className="text-slate-400">TARGET:</span> DEMO SYSTEM
       </span>
     )
   }
@@ -95,6 +96,7 @@ export default function App() {
   const route = parseRoute(hash)
   const [showX402Modal, setShowX402Modal] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [guardOpen, setGuardOpen] = useState(false)
   const wallet = usePeraWallet()
 
   // Fetch report findings & components for command palette search
@@ -129,7 +131,7 @@ export default function App() {
       break
     case 'audit':
     default:
-      page = <AuditPage />
+      page = <AuditPage onOpenGuard={() => setGuardOpen(true)} />
       break
   }
 
@@ -210,7 +212,7 @@ export default function App() {
 
       {/* Flight-Instrument Footer */}
       <footer className="border-t border-[#2A2E35] py-4 bg-[#0A0B0D]">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 text-xs text-slate-500 sm:px-6">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 text-xs text-slate-400 sm:px-6">
           <div className="flex items-center gap-2 font-mono text-[11px]">
             <span className="font-bold text-slate-400">CODIT ENGINE</span>
             <span className="text-[#2A2E35]">|</span>
@@ -220,7 +222,7 @@ export default function App() {
               Design System Specimen ↗
             </a>
           </div>
-          <div className="font-mono text-[10px] text-slate-500 flex items-center gap-3">
+          <div className="font-mono text-[10px] text-slate-400 flex items-center gap-3">
             <span>FastAPI</span>
             <span className="text-[#2A2E35]">•</span>
             <span>openCypher</span>
@@ -240,7 +242,11 @@ export default function App() {
         onClose={() => setPaletteOpen(false)}
         findings={findings}
         components={components}
+        onOpenGuard={() => setGuardOpen(true)}
       />
+
+      {/* Global Guard Drawer */}
+      <GuardDrawer isOpen={guardOpen} onClose={() => setGuardOpen(false)} />
 
       {/* Global x402 Modal */}
       <X402VerificationModal

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
- * REST client for Codit — Intelligent Codebase Audit & Architecture Platform.
+ * REST client for Codit — Assurance Layer for AI-Written Code & Architecture Platform.
  */
 
 const API_BASE = import.meta.env.VITE_API_BASE || ''
@@ -25,6 +25,7 @@ async function request(path, options = {}) {
       status: res.status,
       code: body?.error?.code || 'error',
       message: body?.error?.message || `Request failed (${res.status}).`,
+      payment_requirements: body?.payment_requirements || null,
     }
   }
   return body
@@ -40,7 +41,7 @@ const qs = (params) => {
 }
 
 export const api = {
-  // --- Core Graph Explorer Endpoints (Preserved) ---
+  // --- Core Health & Graph Endpoints ---
   health: () => request('/health'),
   stats: () => request('/stats'),
   search: (q, opts = {}) => request(`/components${qs({ q, type: opts.type, limit: opts.limit })}`),
@@ -51,7 +52,62 @@ export const api = {
   leaderboard: (limit = 8) => request(`/criticality${qs({ limit })}`),
   path: (from, to) => request(`/path${qs({ from, to })}`),
 
-  // --- Module 1: Ingestion Pipeline ---
+  // --- One-Shot Audits API (Section 10) ---
+  createAuditJson: (payload) =>
+    request('/audits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+  createAuditZip: (formData) =>
+    request('/audits', {
+      method: 'POST',
+      body: formData,
+    }),
+  getAudit: (auditId) => request(`/audits/${encodeURIComponent(auditId)}`),
+  getAuditEvents: (auditId, after = 0) =>
+    request(`/audits/${encodeURIComponent(auditId)}/events${qs({ after })}`),
+  getAuditFindings: (auditId, params = {}) =>
+    request(`/audits/${encodeURIComponent(auditId)}/findings${qs(params)}`),
+  getAuditProcess: (auditId) => request(`/audits/${encodeURIComponent(auditId)}/process`),
+  getAuditLicenses: (auditId) => request(`/audits/${encodeURIComponent(auditId)}/licenses`),
+  getProfileReport: (auditId, { profile = 'technical', hourlyRate = '', paymentSignature = '' } = {}) =>
+    request(
+      `/audits/${encodeURIComponent(auditId)}/report${qs({
+        profile,
+        format: 'json',
+        hourly_rate: hourlyRate,
+      })}`,
+      paymentSignature ? { headers: { 'PAYMENT-SIGNATURE': paymentSignature } } : {}
+    ),
+  getProfileReportUrl: (auditId, { profile = 'technical', format = 'html', hourlyRate = '' } = {}) =>
+    `${API_BASE}/api/audits/${encodeURIComponent(auditId)}/report${qs({
+      profile,
+      format,
+      hourly_rate: hourlyRate,
+    })}`,
+  deleteAudit: (auditId) =>
+    fetch(`${API_BASE}/api/audits/${encodeURIComponent(auditId)}`, { method: 'DELETE' }),
+
+  // --- Attestations (Section 10) ---
+  createAttestChallenge: (repo) =>
+    request('/attest/challenge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repo }),
+    }),
+  issueAttestation: (auditId, { consentPublish = true, paymentSignature = '' } = {}) =>
+    request(`/audits/${encodeURIComponent(auditId)}/attest`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(paymentSignature ? { 'PAYMENT-SIGNATURE': paymentSignature } : {}),
+      },
+      body: JSON.stringify({ consent_publish: Boolean(consentPublish) }),
+    }),
+  getPublicAttestation: (attId) => request(`/attest/${encodeURIComponent(attId)}`),
+
+  // --- Legacy Endpoints (Preserved via signed-cookie wrapper) ---
   ingestStatus: () => request('/ingest/status'),
   ingestPublic: (url, ref = 'main') =>
     request('/ingest/public', {
@@ -70,8 +126,6 @@ export const api = {
       method: 'POST',
       body: formData,
     }),
-
-  // --- Modules 5-8: Audit, Scoring, Roadmap & Reports ---
   runAnalysis: (goal = 'production') =>
     request('/analyze/run', {
       method: 'POST',
@@ -83,14 +137,12 @@ export const api = {
   getMarkdownReportUrl: () => `${API_BASE}/api/report/markdown`,
   getHtmlReportUrl: () => `${API_BASE}/api/report/html`,
 
-  // x402 Algorand payment flow. The server returns PAYMENT-REQUIRED on 402;
-  // the caller signs its payment group with usePeraWallet().signTransactions.
+  // x402 Algorand payment flow
   paymentRequirements: () => request('/payments/requirements'),
-  paidReport: (paymentSignature) => request('/payments/report', {
-    headers: {
-      'PAYMENT-SIGNATURE': paymentSignature,
-    },
-  }),
+  paidReport: (paymentSignature) =>
+    request('/payments/report', {
+      headers: { 'PAYMENT-SIGNATURE': paymentSignature },
+    }),
 }
 
 export function useFetch(fn, deps = []) {

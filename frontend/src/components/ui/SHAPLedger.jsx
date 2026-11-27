@@ -52,7 +52,7 @@ export default function SHAPLedger({
       </div>
 
       {/* Ledger Table */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" tabIndex={0} aria-label="SHAP feature attribution table">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr
