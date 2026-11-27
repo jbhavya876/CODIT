@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CODIT Attestation Verification — {{ attestation_id }}</title>
+  <link rel="stylesheet" href="/static/verify.css">
+</head>
+<body>
+  <main class="verify-shell">
+    <header class="verify-header">
+      <div class="verify-brand">CODIT // ASSURANCE VERIFICATION</div>
+      <div class="verify-state state-{{ badge_state|lower }}">{{ badge_state }}{% if is_revoked %} ({{ revoked_reason_code }}){% endif %}</div>
+    </header>
+
+    <section class="verdict-card">
+      <div class="verdict-score">{{ score }}<span>/100</span></div>
+      <div class="verdict-meta">
+        <h1>Phase: {{ phase }}</h1>
+        <p class="subject-line"><strong>Subject:</strong> <code>{{ subject_label }}</code></p>
+        <p class="control-note">{{ control_note }}</p>
+        {% if ahead_by is not none %}
+        <p class="staleness-note">Repository HEAD is {{ ahead_by }} commit(s) ahead of the audited commit.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="grid-two">
+      <div class="panel">
+        <h2>Cryptographic Verification</h2>
+        <dl>
+          <dt>Attestation ID</dt><dd><code>{{ attestation_id }}</code></dd>
+          <dt>Server Ed25519 Check</dt><dd>{% if signature_valid %}SIGNATURE VALID (kid={{ kid }}){% else %}INVALID SIGNATURE{% endif %}</dd>
+          <dt>Issued / Expires</dt><dd><code>{{ issued_at }}</code> &rarr; <code>{{ expires_at }}</code>{% if is_expired %} (EXPIRED){% endif %}</dd>
+          {% if is_revoked %}<dt>Revoked At</dt><dd><code>{{ revoked_at }}</code> ({{ revoked_reason_code }})</dd>{% endif %}
+          <dt>Findings Digest</dt><dd><code class="wrap">{{ findings_digest }}</code></dd>
+          <dt>Rubric</dt><dd><a href="/rubric/2.0.0">codit-rubric {{ rubric_version }}</a></dd>
+        </dl>
+      </div>
+
+      <div class="panel">
+        <h2>Coverage Statements</h2>
+        <ul>
+          {% for stmt in coverage_statements %}
+          <li>{{ stmt }}</li>
+          {% endfor %}
+        </ul>
+        {% if qualifiers %}
+        <h3>Phase Qualifiers</h3>
+        <ul>{% for q in qualifiers %}<li><code>{{ q }}</code></li>{% endfor %}</ul>
+        {% endif %}
+        {% if blockers %}
+        <h3>Blockers</h3>
+        <ul>{% for b in blockers %}<li><code>{{ b }}</code></li>{% endfor %}</ul>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Dimensions</h2>
+      <table>
+        <thead><tr><th>Dimension</th><th>Score</th></tr></thead>
+        <tbody>
+          {% for dname, dscore in dimensions.items() %}
+          <tr><td><code>{{ dname }}</code></td><td>{% if dscore is none %}Not assessed{% else %}{{ dscore }}/100{% endif %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Verify It Yourself (Offline CLI)</h2>
+      <pre>curl -sSL -o attestation.json https://coditt.xyz/api/attest/{{ attestation_id }}
+codit-guard attest verify attestation.json --keys https://coditt.xyz/.well-known/codit-keys.json</pre>
+      <p class="links-row">
+        <a href="/api/attest/{{ attestation_id }}">Signed Attestation JSON</a> |
+        <a href="/.well-known/codit-keys.json">Published Public Keys</a> |
+        <a href="/.well-known/codit-revocations.json">Revocations List</a>
+      </p>
+    </section>
+
+    <footer class="verify-footer">
+      <p>{{ methodology_text }}</p>
+    </footer>
+  </main>
+</body>
+</html>

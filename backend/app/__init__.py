@@ -164,6 +164,24 @@ def create_app(config_overrides: dict[str, Any] | None = None) -> FastAPI:
     except ImportError:
         pass
 
+    try:
+        from backend.app.routes.attest import router as attest_router
+        app.include_router(attest_router)
+    except ImportError:
+        pass
+
+    try:
+        from backend.app.routes.public import router as public_router
+        app.include_router(public_router)
+    except ImportError:
+        pass
+
+    try:
+        from backend.app.routes.admin import router as admin_router
+        app.include_router(admin_router)
+    except ImportError:
+        pass
+
     # Static rubric documentation endpoint (no scripts)
     @app.get("/rubric/2.0.0", include_in_schema=False)
     async def serve_rubric_v2():

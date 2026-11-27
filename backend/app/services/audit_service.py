@@ -533,6 +533,18 @@ def run_audit_pipeline(
         }
 
         source_deleted = target_type == "zip"
+        verify_tokens: List[str] = []
+        for entry in entries:
+            norm_e = entry.path.replace("\\", "/").lstrip("/")
+            while norm_e.startswith("./"):
+                norm_e = norm_e[2:]
+            if norm_e == ".codit/verify":
+                for line in (entry.content or "").splitlines()[:8]:
+                    sline = line.strip()
+                    if sline.startswith("codit-verify=") and len(sline) <= 160:
+                        tok = sline.split("=", 1)[1].strip()
+                        if tok:
+                            verify_tokens.append(tok)
         report_id = f"audit-{uuid.uuid4().hex[:8]}"
         created_ts = time.time()
 
@@ -591,6 +603,7 @@ def run_audit_pipeline(
                     "stats": graph_stats,
                     "ml_insights": ml_insights,
                     "effort": effort_summary,
+                    "verify_tokens": verify_tokens[:4],
                 }
                 # Replace findings for idempotent re-runs on the same audit_id
                 session.query(FindingRow).filter(FindingRow.audit_id == audit_id).delete()
