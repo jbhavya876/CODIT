@@ -10,24 +10,36 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
 # node / build
 node_modules/
 frontend/dist/
 dist/
 build/
+*.whl
 
 # os / editors
 .DS_Store
+Thumbs.db
 .idea/
 .vscode/
 
-# testing & reports
+# testing, local db & reports
 test-results/
 playwright-report/
 blob-report/
 .cache/
 .data/
+*.db
+*.sqlite
+*.sqlite3
 *.egg-info/
 *.log
 

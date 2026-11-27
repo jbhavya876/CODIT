@@ -66,4 +66,65 @@ npm --prefix frontend run build
 uvicorn backend.app:create_app --factory --host 127.0.0.1 --port 8000 --workers 2
 ```
 
-Operations and incident playbooks live in [`docs/RUNBOOK.md`](docs/RUNBOOK.md) and security architecture in [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
+## Local Gate & GitHub Action
+
+Install locally from the repository packages (or via PyPI once published):
+
+```bash
+pip install ./packages/codit_core ./packages/codit_guard
+codit-guard check --offline
+```
+
+Use in GitHub Actions via [`action.yml`](action.yml):
+
+```yaml
+- uses: jbhavya876/CODIT@v1
+  with:
+    fail-on: high
+    install-from: github # switch to 'pypi' after publishing codit-core & codit-guard
+    upload-sarif: "true"
+```
+
+Pre-commit integration is defined in [`.pre-commit-hooks.yaml`](.pre-commit-hooks.yaml).
+
+---
+
+## Repository Layout
+
+| Path | Purpose |
+|---|---|
+| `backend/` | FastAPI server, bare-history `dulwich` reader, license resolver, Rubric `2.0.0`, Alembic migrations, Ed25519 attestations, and `backend/tests/` (`124` tests) |
+| `frontend/` | React 18 + Tailwind + Vite Forensic Luxury SPA (`Audit Cockpit`, `Ingest Repo`, `Process`, `Licenses`, `Reports`, `Attest`) |
+| `packages/codit_core/` | Pure zero-DB rule catalog (`AGT-001..AGT-012`, `GRD-001..GRD-002`, `LIC-001..LIC-008`), secret scanner, and AST test body hashing |
+| `packages/codit_guard/` | Local CLI diff gate, Claude Code `PreToolUse` hook, `.codit/baseline.json`, SARIF 2.1.0 output, and offline attestation verifier |
+| `scripts/` | Offline Ed25519 keygen (`keygen_attest.py`), zero-echo runtime secret generator (`bootstrap_env.py`), calibration, and token export |
+| `docs/` | Architecture Decision Records (`docs/adr/`), Rubric specification, Threat Model, Runbook, UI Design System, and Validation Evidence (`docs/evidence/`) |
+
+---
+
+## Deployment & Operator Tooling
+
+- **Environment template:** Copy [`.env.example`](.env.example) to `.env` for local development. In production (`ENV=production`), SQLite is rejected and a PostgreSQL `DATABASE_URL` is required.
+- **Offline Ed25519 attestation keypair (zero secret stdout output):**
+  ```bash
+  python scripts/keygen_attest.py --kid 2026-12-a --publish
+  ```
+- **Runtime secret bootstrap (writes mode `0600` under `.secrets/prod.env`):**
+  ```bash
+  python scripts/bootstrap_env.py --public-base-url https://coditt.xyz
+  ```
+- **Containers & Render:** [`docker-compose.yml`](docker-compose.yml) (API, network-isolated worker, Neo4j) and [`render.yaml`](render.yaml) (Render web service + `codit-postgres`).
+
+---
+
+## Documentation & Validation Evidence
+
+- [Rubric `2.0.0` Specification (`docs/RUBRIC.md`)](docs/RUBRIC.md)
+- [Threat Model (`docs/THREAT_MODEL.md`)](docs/THREAT_MODEL.md) · [Operations Runbook (`docs/RUNBOOK.md`)](docs/RUNBOOK.md)
+- [UI Design System (`docs/UI_DESIGN_SYSTEM.md`)](docs/UI_DESIGN_SYSTEM.md) · [Architecture Decision Records (`docs/adr/`)](docs/adr/)
+- [Changelog (`CHANGELOG.md`)](CHANGELOG.md)
+- Validation evidence: [`dogfood_audit.md`](docs/evidence/dogfood_audit.md) · [`real_world_corpus.md`](docs/evidence/real_world_corpus.md) · [`human_review.md`](docs/evidence/human_review.md)
+
+## License
+
+Released under the [MIT License](LICENSE).
