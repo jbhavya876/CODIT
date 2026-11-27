@@ -50,8 +50,8 @@ def test_osv_vulnerability_flags_cve():
 
 def test_planted_credential_is_caught():
     """Verify that deliberately planted API keys / credentials are caught with line attribution."""
-    aws_token = AWS_ACCESS_KEY_ID or "".join(["A", "K", "I", "A", "0" * 16])
-    stripe_token = STRIPE_API_KEY or "".join(["s", "k", "_", "t", "e", "s", "t", "_", "m", "o", "c", "k" * 6])
+    aws_token = "".join(["A", "K", "I", "A", "0" * 16])
+    stripe_token = "".join(["s", "k", "_", "t", "e", "s", "t", "_"]) + ("m0ck" * 6)
     planted_content = f"""# Config settings
 API_HOST = "api.prod.company.com"
 AWS_ACCESS_KEY_ID = "{aws_token}"

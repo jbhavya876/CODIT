@@ -69,16 +69,34 @@ def create_sample_zip() -> bytes:
     return buf.getvalue()
 
 
-def test_static_frontend_serving(client):
-    """Test that FastAPI correctly serves index.html and SPA routes."""
+def test_static_frontend_serving(client, tmp_path, monkeypatch):
+    """Test that FastAPI serves index.html & SPA routes when dist exists, and discovery JSON otherwise."""
+    import backend.app as app_mod
+
     res = client.get("/")
     assert res.status_code == 200
-    assert "<!doctype html>" in res.text.lower() or "<html" in res.text.lower()
+    if app_mod.FRONTEND_DIST.is_dir():
+        assert "<!doctype html>" in res.text.lower() or "<html" in res.text.lower()
+        res_spa = client.get("/audit/test-job-123")
+        assert res_spa.status_code == 200
+        assert "<!doctype html>" in res_spa.text.lower() or "<html" in res_spa.text.lower()
+    else:
+        body = res.json()
+        assert body["service"] == "Codebase Audit Platform API"
+        assert body["version"] == "3.0.0"
 
-    # Any non-API route should serve index.html (SPA routing)
-    res_spa = client.get("/audit/test-job-123")
-    assert res_spa.status_code == 200
-    assert "<!doctype html>" in res_spa.text.lower() or "<html" in res_spa.text.lower()
+    # Always verify SPA fallback & static asset serving against a controlled dist directory
+    fake_dist = tmp_path / "dist"
+    (fake_dist / "assets").mkdir(parents=True)
+    (fake_dist / "index.html").write_text("<!doctype html><html><body>CODIT</body></html>", encoding="utf-8")
+    monkeypatch.setattr(app_mod, "FRONTEND_DIST", fake_dist)
+    spa_client = TestClient(create_app())
+    res_fake = spa_client.get("/")
+    assert res_fake.status_code == 200
+    assert "<!doctype html>" in res_fake.text.lower()
+    res_spa_fake = spa_client.get("/audit/test-job-123")
+    assert res_spa_fake.status_code == 200
+    assert "<!doctype html>" in res_spa_fake.text.lower()
 
 
 def test_full_pipeline_zip_ingest_analyze_report(client):

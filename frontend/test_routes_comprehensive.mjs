@@ -5,7 +5,9 @@ async function runRegressionSuite() {
   console.log('  CODIT 2.0 FULL ROUTE & UI REGRESSION TEST SUITE   ')
   console.log('=====================================================')
 
-  const browser = await chromium.launch({ headless: true, channel: 'chrome' })
+  const browser = process.env.CI
+    ? await chromium.launch({ headless: true })
+    : await chromium.launch({ headless: true }).catch(() => chromium.launch({ headless: true, channel: 'chrome' }))
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const page = await context.newPage()
 

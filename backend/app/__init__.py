@@ -235,7 +235,7 @@ def create_app(config_overrides: dict[str, Any] | None = None) -> FastAPI:
         async def root():
             return {
                 "service": "Codebase Audit Platform API",
-                "version": "2.0.0",
+                "version": "3.0.0",
                 "graph_backend": graph_service.mode(),
                 "docs": "/api/docs",
                 "health": "/api/health",

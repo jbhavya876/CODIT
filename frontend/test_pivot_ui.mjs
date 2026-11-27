@@ -20,7 +20,9 @@ async function runPivotUiSuite() {
   console.log('  CODIT 3.0 PIVOT UI + AXE ACCESSIBILITY SUITE       ')
   console.log('=====================================================')
 
-  const browser = await chromium.launch({ headless: true, channel: 'chrome' })
+  const browser = process.env.CI
+    ? await chromium.launch({ headless: true })
+    : await chromium.launch({ headless: true }).catch(() => chromium.launch({ headless: true, channel: 'chrome' }))
   const consoleErrors = []
 
   try {
