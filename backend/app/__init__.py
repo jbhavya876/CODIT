@@ -158,6 +158,30 @@ def create_app(config_overrides: dict[str, Any] | None = None) -> FastAPI:
     except ImportError:
         pass
 
+    # Static rubric documentation endpoint (no scripts)
+    @app.get("/rubric/2.0.0", include_in_schema=False)
+    async def serve_rubric_v2():
+        import html as _html
+        from pathlib import Path as _Path
+        from fastapi.responses import HTMLResponse
+
+        rubric_md_path = _Path(__file__).resolve().parents[2] / "docs" / "RUBRIC.md"
+        if rubric_md_path.is_file():
+            raw_md = rubric_md_path.read_text(encoding="utf-8")
+        else:
+            from scripts.gen_rubric_doc import render_rubric_markdown
+            raw_md = render_rubric_markdown()
+        escaped = _html.escape(raw_md)
+        body = (
+            "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
+            "<meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; style-src 'unsafe-inline'\">"
+            "<title>CODIT Rubric 2.0.0</title>"
+            "<style>body{background:#0A0B0D;color:#EFEAE0;font-family:monospace;padding:2rem;max-width:960px;margin:0 auto;line-height:1.55;}"
+            "pre{white-space:pre-wrap;word-break:break-word;background:#121418;padding:1.5rem;border:1px solid #2A2E37;}</style>"
+            f"</head><body><pre>{escaped}</pre></body></html>"
+        )
+        return HTMLResponse(content=body)
+
     # Static file serving & SPA fallback
     if FRONTEND_DIST.is_dir():
         app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")

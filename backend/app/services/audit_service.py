@@ -43,6 +43,7 @@ from backend.app.ml.explainability import compute_shap_score_attributions
 from backend.app.ml.onnx_scorer import run_onnx_inference
 from backend.app.parsers.ast.treesitter_walker import parse_codebase_ast
 from backend.app.parsers.manifest import extract_manifests_and_signals
+from backend.app.scoring.effort_model import compute_effort_estimate
 from backend.app.scoring.roadmap_synthesis import (
     AuditRoadmap,
     RoadmapActionItem,
@@ -51,6 +52,7 @@ from backend.app.scoring.roadmap_synthesis import (
 )
 from backend.app.scoring.rubric import RUBRIC_VERSION
 from backend.app.scoring.rules_engine import AuditScorecard, DimensionalScore, score_audit
+from backend.app.scoring.rules_engine_v2 import AuditScorecardV2, DimensionalScoreV2, score_audit_v2
 from backend.app.services import graph_service
 from backend.app.services.demo_graph import GraphHandle, serialize_graph
 
@@ -449,8 +451,16 @@ def run_audit_pipeline(
             },
         )
 
-        # 4. Deterministic scoring (v1.0.0 in P0; v2.0.0 added in P6)
-        scorecard = score_audit(findings)
+        # 4. Deterministic scoring (v2.0.0 with immutable rubric persistence)
+        row_coverage = dict(existing_row.coverage_json or {}) if existing_row else {}
+        row_coverage["licenses"] = licenses_coverage
+        row_process = dict(existing_row.process_json or {}) if existing_row else {}
+        scorecard = score_audit_v2(
+            findings,
+            coverage=row_coverage,
+            process_data=row_process,
+        )
+        effort_summary = compute_effort_estimate(findings)
         emit_event(audit_id, "score", "score_done", data={"overall": scorecard.overall_score})
 
         # 5. Isolated graph assembly
@@ -523,17 +533,11 @@ def run_audit_pipeline(
             ml_insights=ml_insights,
             rubric_version=RUBRIC_VERSION,
             audit_id=audit_id,
+            effort=effort_summary,
         )
 
         # 9. Persist ONLY derived data (NO source code) in SQLAlchemy
-        scorecard_dict = {
-            "rubric_version": RUBRIC_VERSION,
-            "overall_score": scorecard.overall_score,
-            "phase": scorecard.phase,
-            "has_critical_blocker": scorecard.has_critical_blocker,
-            "findings_summary": scorecard.findings_summary,
-            "dimensions": {k: asdict(v) for k, v in scorecard.dimensions.items()},
-        }
+        scorecard_dict = scorecard.to_v2_dict()
         roadmap_dict = {
             "goal": roadmap.goal,
             "summary_narrative": roadmap.summary_narrative,
@@ -567,6 +571,7 @@ def run_audit_pipeline(
                     "criticality_leaderboard": leaderboard,
                     "stats": graph_stats,
                     "ml_insights": ml_insights,
+                    "effort": effort_summary,
                 }
                 # Replace findings for idempotent re-runs on the same audit_id
                 session.query(FindingRow).filter(FindingRow.audit_id == audit_id).delete()
@@ -658,14 +663,44 @@ def get_report_for_audit(audit_id: str) -> Optional[AuditReport]:
         ]
 
         sc = row.scorecard_json
-        dims = {k: DimensionalScore(**v) for k, v in sc["dimensions"].items()}
-        scorecard = AuditScorecard(
-            overall_score=sc["overall_score"],
-            phase=sc["phase"],
-            dimensions=dims,
-            has_critical_blocker=sc["has_critical_blocker"],
-            findings_summary=sc["findings_summary"],
-        )
+        sc_version = sc.get("rubric_version") or row.rubric_version or "1.0.0"
+        if sc_version == "2.0.0":
+            dims_v2 = {
+                k: DimensionalScoreV2(
+                    dimension=v.get("dimension", k),
+                    score=v.get("score"),
+                    assessed=bool(v.get("assessed", v.get("score") is not None)),
+                    not_applicable=bool(v.get("not_applicable", False)),
+                    reason=v.get("reason"),
+                    weight_effective=float(v.get("weight_effective", 0.0)),
+                    findings_count=int(v.get("findings_count", 0)),
+                    critical_count=int(v.get("critical_count", 0)),
+                    high_count=int(v.get("high_count", 0)),
+                    medium_count=int(v.get("medium_count", 0)),
+                    low_count=int(v.get("low_count", 0)),
+                )
+                for k, v in sc["dimensions"].items()
+            }
+            scorecard: AuditScorecard | AuditScorecardV2 = AuditScorecardV2(
+                rubric_version="2.0.0",
+                overall_score=int(sc.get("overall", sc.get("overall_score", 0))),
+                phase=sc["phase"],
+                dimensions=dims_v2,
+                has_critical_blocker=bool(sc["has_critical_blocker"]),
+                findings_summary=sc["findings_summary"],
+                phase_qualifiers=list(sc.get("phase_qualifiers", [])),
+                blockers=list(sc.get("blockers", [])),
+                not_assessed=list(sc.get("not_assessed", [])),
+            )
+        else:
+            dims_v1 = {k: DimensionalScore(**v) for k, v in sc["dimensions"].items()}
+            scorecard = AuditScorecard(
+                overall_score=int(sc["overall_score"]),
+                phase=sc["phase"],
+                dimensions=dims_v1,
+                has_critical_blocker=bool(sc["has_critical_blocker"]),
+                findings_summary=sc["findings_summary"],
+            )
 
         meta = row.report_meta_json
         rm = meta["roadmap"]
@@ -702,4 +737,5 @@ def get_report_for_audit(audit_id: str) -> Optional[AuditReport]:
             ml_insights=meta.get("ml_insights", {}),
             rubric_version=row.rubric_version,
             audit_id=row.id,
+            effort=meta.get("effort"),
         )
