@@ -7,6 +7,7 @@ plus safe dulwich-based history ingestion (ADR-0002).
 
 from __future__ import annotations
 
+import logging
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -17,7 +18,7 @@ from pydantic import BaseModel
 from backend.app.config import Config
 from backend.app.history.acquire import HistoryAcquisitionError, acquire_bare_history
 from backend.app.history.models import HistoryCoverage, HistoryOptions, HistoryResult
-from backend.app.history.worker import run_history_worker
+from backend.app.history.worker import HistoryWorkerError, run_history_worker
 from backend.app.ingestion.git_clone import GitCloneError, clone_private_repo
 from backend.app.ingestion.github_fetch import GitHubIngestionError, fetch_public_repo
 from backend.app.ingestion.models import FileEntry
@@ -105,7 +106,8 @@ def _run_remote_history(
         res = run_history_worker(hist_dir, options=opts)
         audit_service.save_history_result(audit_id, res)
         return res.coverage
-    except HistoryAcquisitionError:
+    except (HistoryAcquisitionError, HistoryWorkerError, OSError) as exc:
+        logging.getLogger(__name__).warning("Remote history failed for %s: %s", audit_id, exc)
         res = HistoryResult(coverage=HistoryCoverage(assessed=False, reason="history_unavailable"))
         audit_service.save_history_result(audit_id, res)
         return res.coverage
@@ -137,7 +139,7 @@ def ingest_public_repo(payload: PublicRepoRequest, response: Response):
             },
         )
     try:
-        entries = fetch_public_repo(url, ref=payload.ref or "main")
+        entries = fetch_public_repo(url, ref=payload.ref or "main", auth_token=Config.GITHUB_API_TOKEN or None)
         audit_id, summary = audit_service.create_staged_audit(url, "public", entries)
         hist_cov = _run_remote_history(audit_id, url, payload.ref, None, payload.history)
         audit_service.set_audit_cookie(response, audit_id)

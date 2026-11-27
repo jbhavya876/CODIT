@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import threading
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
@@ -24,6 +25,9 @@ def get_cached_blob_metrics(blob_sha: str, analyzer_version: str) -> Optional[Di
         if hit is not None:
             _LRU.move_to_end(key)
             return hit
+
+    if os.getenv("CODIT_WORKER_CHILD") == "1":
+        return None
 
     try:
         with session_scope() as session:
@@ -48,6 +52,12 @@ def put_cached_blob_metrics(blob_sha: str, analyzer_version: str, metrics: Dict[
         _LRU.move_to_end(key)
         while len(_LRU) > _LRU_MAX:
             _LRU.popitem(last=False)
+
+    if os.getenv("CODIT_WORKER_CHILD") == "1":
+        return None
+
+    if os.getenv("CODIT_WORKER_CHILD") == "1":
+        return
 
     try:
         with session_scope() as session:

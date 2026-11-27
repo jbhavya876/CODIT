@@ -149,3 +149,55 @@ def test_walk_history_handles_missing_promisor_blob_in_rename_detector(tmp_path)
     res = walk_history(repo_dir, HistoryOptions(max_commits=20))
     assert res.coverage.assessed is True
     assert res.coverage.blobs_unavailable >= 1
+
+
+def test_background_audit_degrades_on_history_worker_failure_and_codeload_fallback(tmp_path, monkeypatch):
+    """HistoryWorkerError or missing git degrades to history_not_assessed instead of internal_error."""
+    import io
+    import zipfile
+    import httpx
+    from backend.app.db.engine import init_db
+    from backend.app.history.models import HistoryOptions
+    from backend.app.history.worker import HistoryWorkerError
+    from backend.app.ingestion import github_fetch as gf
+    from backend.app.routes import audits as audits_route
+    from backend.app.services import audit_service
+
+    init_db()
+    monkeypatch.setattr(gf, "CACHE_DIR", tmp_path / "tree_cache")
+    (tmp_path / "tree_cache").mkdir(parents=True, exist_ok=True)
+
+    # Build a synthetic GitHub codeload zipball containing safe source + ignored traversal/.git paths
+    zbuf = io.BytesIO()
+    with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("demo-main/src/app.py", "def run():\n    return 1\n")
+        zf.writestr("demo-main/.git/HEAD", "ref: refs/heads/main\n")
+        zf.writestr("demo-main/../../evil.py", "print('bad')\n")
+    zip_bytes = zbuf.getvalue()
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        if "api.github.com" in request.url.host:
+            return httpx.Response(403, headers={"x-ratelimit-remaining": "0", "x-ratelimit-reset": "9999999999"})
+        if request.url.host == "codeload.github.com":
+            return httpx.Response(200, content=zip_bytes)
+        return httpx.Response(404)
+
+    transport = httpx.MockTransport(_handler)
+    orig_client = httpx.Client
+    monkeypatch.setattr(gf.httpx, "Client", lambda *a, **kw: orig_client(transport=transport))
+
+    entries = gf.fetch_public_repo("https://github.com/acme/demo", ref="main")
+    assert [e.path for e in entries] == ["src/app.py"]
+
+    # Now simulate HistoryWorkerError inside _run_background_repo_audit -> must complete, not internal_error
+    monkeypatch.setattr(audits_route, "fetch_public_repo", lambda *a, **kw: entries)
+    monkeypatch.setattr(audits_route, "acquire_bare_history", lambda *a, **kw: tmp_path)
+    monkeypatch.setattr(audits_route, "run_history_worker", lambda *a, **kw: (_ for _ in ()).throw(HistoryWorkerError("rlimit")))
+
+    aid = audit_service.create_audit(source_kind="public", source_ref="https://github.com/acme/demo", status="queued")
+    audits_route._run_background_repo_audit(aid, "public", "https://github.com/acme/demo", "main", None, "production", HistoryOptions())
+    row = audit_service.get_audit_row(aid)
+    assert row is not None
+    assert row.status == "completed"
+    assert row.error_code is None
+    assert row.coverage_json["history"]["reason"] == "history_unavailable"

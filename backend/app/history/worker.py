@@ -109,6 +109,7 @@ def run_history_worker(
         popen_kwargs: dict = {
             "stdout": subprocess.PIPE,
             "stderr": subprocess.PIPE,
+            "env": {**os.environ, "CODIT_WORKER_CHILD": "1"},
         }
         if os.name == "nt":
             popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP

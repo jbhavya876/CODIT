@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import shutil
 import tempfile
 from pathlib import Path
@@ -42,7 +43,7 @@ from backend.app.history.acquire import (
     validate_github_repo_input,
 )
 from backend.app.history.models import HistoryCoverage, HistoryOptions, HistoryResult
-from backend.app.history.worker import run_history_worker
+from backend.app.history.worker import HistoryWorkerError, run_history_worker
 from backend.app.ingestion.git_clone import GitCloneError, clone_private_repo
 from backend.app.ingestion.github_fetch import GitHubIngestionError, fetch_public_repo
 from backend.app.ingestion.zip_extract import (
@@ -55,6 +56,7 @@ from backend.app.jobs.runner import submit_job
 from backend.app.scoring.effort_model import validate_hourly_rate
 from backend.app.services import audit_service, graph_service
 
+log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/audits", tags=["audits"])
 
 _STAGE_PROGRESS = {
@@ -112,13 +114,18 @@ def _run_background_zip_audit(
                 hist_res = HistoryResult(coverage=HistoryCoverage(assessed=False, reason=reason))
                 audit_service.emit_event(audit_id, "history", "history_not_assessed")
             else:
-                hist_res = run_history_worker(git_temp_dir, options=hist_opts)
-                audit_service.emit_event(
-                    audit_id,
-                    "history",
-                    "history_done" if hist_res.coverage.assessed else "history_not_assessed",
-                    data={"commits": hist_res.coverage.commits_analyzed},
-                )
+                try:
+                    hist_res = run_history_worker(git_temp_dir, options=hist_opts)
+                    audit_service.emit_event(
+                        audit_id,
+                        "history",
+                        "history_done" if hist_res.coverage.assessed else "history_not_assessed",
+                        data={"commits": hist_res.coverage.commits_analyzed},
+                    )
+                except (HistoryWorkerError, OSError) as exc:
+                    log.warning("ZIP history worker failed for %s: %s", audit_id, exc)
+                    hist_res = HistoryResult(coverage=HistoryCoverage(assessed=False, reason="history_unavailable"))
+                    audit_service.emit_event(audit_id, "history", "history_not_assessed")
         audit_service.save_history_result(audit_id, hist_res)
         audit_service.run_audit_pipeline(
             audit_id=audit_id,
@@ -132,6 +139,7 @@ def _run_background_zip_audit(
         purge_extracted_files(temp_dir)
         _mark_audit_failed(audit_id, "invalid_archive")
     except Exception:
+        log.exception("Background ZIP audit %s failed unexpectedly", audit_id)
         purge_extracted_files(temp_dir)
         _mark_audit_failed(audit_id, "internal_error")
     finally:
@@ -151,7 +159,11 @@ def _run_background_repo_audit(
     hist_dir = Path(tempfile.mkdtemp(prefix="codit_hist_bare_"))
     try:
         if source_kind == "public":
-            entries = fetch_public_repo(target, ref=branch or "main")
+            entries = fetch_public_repo(
+                target,
+                ref=branch or "main",
+                auth_token=Config.GITHUB_API_TOKEN or None,
+            )
         elif source_kind == "private":
             assert temp_dir is not None
             entries = clone_private_repo(target, token or "", temp_dir, branch=branch)
@@ -174,7 +186,8 @@ def _run_background_repo_audit(
                     "history_done" if hist_res.coverage.assessed else "history_not_assessed",
                     data={"commits": hist_res.coverage.commits_analyzed},
                 )
-            except HistoryAcquisitionError:
+            except (HistoryAcquisitionError, HistoryWorkerError, OSError) as exc:
+                log.warning("History step unavailable for %s (%s): %s", audit_id, target, exc)
                 hist_res = HistoryResult(coverage=HistoryCoverage(assessed=False, reason="history_unavailable"))
                 audit_service.emit_event(audit_id, "history", "history_not_assessed")
 
@@ -192,6 +205,7 @@ def _run_background_repo_audit(
             purge_extracted_files(temp_dir)
         _mark_audit_failed(audit_id, "invalid_source")
     except Exception:
+        log.exception("Background repo audit %s (%s) failed unexpectedly", audit_id, target)
         if temp_dir:
             purge_extracted_files(temp_dir)
         _mark_audit_failed(audit_id, "internal_error")

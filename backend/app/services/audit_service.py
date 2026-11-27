@@ -525,8 +525,16 @@ def run_audit_pipeline(
 
         # 8. ONNX & SHAP insights strictly against this audit's isolated handle
         graph_stats = graph_service.stats(graph=handle)
-        onnx_metrics = run_onnx_inference(entries, findings, graph_stats)
-        shap_explainability = compute_shap_score_attributions(scorecard, findings, entries, graph_stats)
+        try:
+            onnx_metrics = run_onnx_inference(entries, findings, graph_stats)
+        except Exception as exc:
+            log.warning("ONNX heuristic scorer failed for %s: %s", audit_id, exc)
+            onnx_metrics = {"unavailable": True, "defect_risk_tier": "MODERATE"}
+        try:
+            shap_explainability = compute_shap_score_attributions(scorecard, findings, entries, graph_stats)
+        except Exception as exc:
+            log.warning("SHAP heuristic attribution failed for %s: %s", audit_id, exc)
+            shap_explainability = {"unavailable": True, "waterfall": []}
         ml_insights = {
             "onnx_metrics": onnx_metrics,
             "shap_explainability": shap_explainability,
@@ -610,20 +618,20 @@ def run_audit_pipeline(
                 for f in findings:
                     session.add(
                         FindingRow(
-                            finding_uid=f.id,
+                            finding_uid=(f.id or "")[:128],
                             audit_id=audit_id,
-                            fingerprint=f.fingerprint or f.id,
-                            rule_id=f.rule_id,
-                            dimension=f.dimension,
-                            severity=f.severity,
-                            confidence=f.confidence,
-                            basis=f.basis,
-                            evidence_file=f.evidence_file,
+                            fingerprint=(f.fingerprint or f.id or "")[:64],
+                            rule_id=(f.rule_id or "")[:64],
+                            dimension=(f.dimension or "")[:32],
+                            severity=(f.severity or "")[:16],
+                            confidence=(f.confidence or "")[:16],
+                            basis=(f.basis or "PATTERN")[:32],
+                            evidence_file=(f.evidence_file or "")[:512],
                             evidence_line=f.evidence_line,
-                            commit_sha=f.commit_sha,
+                            commit_sha=(f.commit_sha[:64] if f.commit_sha else None),
                             description=f.description,
                             remediation=f.remediation or "",
-                            component_id=f.component_id,
+                            component_id=(f.component_id[:512] if f.component_id else None),
                             params_json=f.params or {},
                         )
                     )
@@ -632,6 +640,7 @@ def run_audit_pipeline(
         return report
 
     except Exception:
+        log.exception("Audit pipeline failed for %s", audit_id)
         with session_scope() as session:
             row = session.get(AuditRow, audit_id)
             if row is not None:
