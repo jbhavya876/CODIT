@@ -22,3 +22,4 @@ if _REPO_ROOT not in sys.path:
 def pytest_configure(config):
     """Disable rate limiting for the whole test session by default."""
     os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
+    config.addinivalue_line("markers", "perf: performance benchmark tests")

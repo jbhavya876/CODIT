@@ -1,0 +1,9 @@
+{
+  "session_id": "sess_01",
+  "working_directory": ".",
+  "tool_name": "Write",
+  "tool_input": {
+    "file_path": "tests/test_new.py",
+    "content": "def test_always():\n    assert True\n"
+  }
+}

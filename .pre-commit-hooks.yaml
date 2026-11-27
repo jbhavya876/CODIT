@@ -1,0 +1,7 @@
+- id: codit-guard
+  name: CODIT Guard (staged diff verification check)
+  description: Run local static process-integrity and secret checks against staged changes
+  entry: codit-guard check --staged
+  language: python
+  pass_filenames: false
+  stages: [pre-commit]

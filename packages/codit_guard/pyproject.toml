@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codit-guard"
+version = "3.0.0"
+description = "Local-first diff verification gate for coding agents, commits, and CI"
+requires-python = ">=3.10"
+dependencies = [
+    "codit-core>=3.0.0",
+    "pyyaml>=6.0",
+    "jsonschema>=4.20",
+]
+
+[project.optional-dependencies]
+verify = ["cryptography>=42.0"]
+
+[project.scripts]
+codit-guard = "codit_guard.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+codit_guard = ["schemas/*.json"]

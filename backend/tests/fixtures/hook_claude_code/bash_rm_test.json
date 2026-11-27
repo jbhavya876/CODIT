@@ -1,0 +1,8 @@
+{
+  "session_id": "sess_01",
+  "working_directory": ".",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "rm -f tests/test_app.py"
+  }
+}

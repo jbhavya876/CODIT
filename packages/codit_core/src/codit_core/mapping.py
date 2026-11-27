@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Iterable, List, Optional, Tuple
 
+from codit_core.fingerprint import normalize_path
+
 _JS_IMPORT_RE = re.compile(
     r"""(?:import\s+[^'"]*?\s+from\s+['"]([^'"]+)['"]|require\(\s*['"]([^'"]+)['"]\s*\))"""
 )
@@ -76,7 +78,7 @@ def _resolve_python_imports(test_path: str, content: str, candidate_set: set[str
                         f"src/{mod_path}/{alias.name}.py",
                     ])
         for cand in module_candidates:
-            cand_norm = cand.lstrip("./")
+            cand_norm = normalize_path(cand)
             if cand_norm in candidate_set and cand_norm not in results:
                 results.append(cand_norm)
     return results
@@ -91,7 +93,7 @@ def _resolve_js_imports(test_path: str, content: str, candidate_set: set[str]) -
         spec = m.group(1) or m.group(2)
         if not spec or not spec.startswith("."):
             continue
-        joined = posixpath.normpath(posixpath.join(test_dir, spec)).lstrip("./")
+        joined = normalize_path(posixpath.normpath(posixpath.join(test_dir, spec)))
         tries = [joined]
         for ext in exts:
             tries.append(f"{joined}{ext}")

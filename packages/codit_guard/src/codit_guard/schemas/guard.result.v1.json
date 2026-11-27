@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "codit.guard.result.v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "tool",
+    "scope",
+    "base",
+    "head",
+    "config_source",
+    "findings",
+    "baselined_count",
+    "suppressed_count",
+    "not_assessed",
+    "duration_ms"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "codit.guard.result.v1" },
+    "tool": { "type": "string" },
+    "scope": { "enum": ["staged", "net", "per-commit", "paths", "hook"] },
+    "base": { "type": ["string", "null"] },
+    "head": { "type": ["string", "null"] },
+    "config_source": { "enum": ["base", "working", "default"] },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "dimension", "severity", "confidence", "basis", "evidence_file", "fingerprint", "description"],
+        "properties": {
+          "id": { "type": "string" },
+          "rule_id": { "type": "string" },
+          "dimension": { "type": "string" },
+          "severity": { "enum": ["critical", "high", "medium", "low", "info"] },
+          "confidence": { "enum": ["high", "medium", "low"] },
+          "basis": { "type": "string" },
+          "evidence_file": { "type": "string" },
+          "evidence_line": { "type": ["integer", "null"] },
+          "commit_sha": { "type": ["string", "null"] },
+          "fingerprint": { "type": "string" },
+          "description": { "type": "string" },
+          "remediation": { "type": "string" }
+        }
+      }
+    },
+    "baselined_count": { "type": "integer", "minimum": 0 },
+    "suppressed_count": { "type": "integer", "minimum": 0 },
+    "expired_suppressions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "not_assessed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["check", "reason"],
+        "properties": {
+          "check": { "type": "string" },
+          "reason": { "type": "string" },
+          "path": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "duration_ms": { "type": "integer", "minimum": 0 }
+  }
+}

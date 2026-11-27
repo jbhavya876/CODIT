@@ -1,0 +1,10 @@
+{
+  "session_id": "sess_01",
+  "working_directory": ".",
+  "tool_name": "Edit",
+  "tool_input": {
+    "file_path": "tests/test_app.py",
+    "old_string": "def test_ok():\n    assert fn(1) == 2",
+    "new_string": "@pytest.mark.skip(reason=\"later\")\ndef test_ok():\n    assert fn(1) == 2"
+  }
+}
