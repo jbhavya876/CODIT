@@ -1,0 +1,78 @@
+# Data-driven AI agent attribution signatures (Section P2)
+# Verified against public vendor documentation and commit conventions.
+
+signatures:
+  - agent_id: claude-code
+    kind: trailer
+    key: co-authored-by
+    match: "(?i)claude\\b.*<(?:noreply@anthropic\\.com|claude@anthropic\\.com)>"
+    notes: "Default Claude Code Co-Authored-By git commit trailer"
+    last_verified: "2026-11-27 (docs/Anthropic attribution format)"
+
+  - agent_id: claude-code
+    kind: footer
+    match: "(?i)generated\\s+with\\s+(?:\\[)?claude\\s+code(?:\\])?"
+    notes: "Default Claude Code commit/PR footer signature"
+    last_verified: "2026-11-27 (docs/Anthropic attribution format)"
+
+  - agent_id: github-copilot
+    kind: trailer
+    key: co-authored-by
+    match: "(?i)(?:github\\s+)?copilot\\b.*<(?:\\d+\\+)?copilot@(?:users\\.noreply\\.)?github\\.com>"
+    notes: "GitHub Copilot coding agent Co-authored-by trailer"
+    last_verified: "2026-11-27 (GitHub Copilot CLI/Agent conventions)"
+
+  - agent_id: github-copilot
+    kind: trailer
+    key: copilot-agent
+    match: "(?i)^github-copilot$"
+    notes: "Structured Copilot-Agent trailer"
+    last_verified: "2026-11-27 (GitHub Copilot agent trailer docs)"
+
+  - agent_id: github-copilot
+    kind: bot_account
+    match: "(?i)(?:github-copilot|copilot-swe-agent)\\[bot\\]"
+    notes: "GitHub App bot author/committer handle for Copilot coding agent"
+    last_verified: "2026-11-27 (GitHub bot account docs)"
+
+  - agent_id: cursor-agent
+    kind: trailer
+    key: co-authored-by
+    match: "(?i)cursor\\b.*cursoragent@cursor\\.com"
+    notes: "Cursor Agent Co-authored-by git commit trailer"
+    last_verified: "2026-11-27 (Cursor Agent git attribution docs)"
+
+  - agent_id: cursor-agent
+    kind: bot_account
+    match: "(?i)cursoragent(?:@cursor\\.com|\\[bot\\])"
+    notes: "Cursor cloud agent author/committer identity"
+    last_verified: "2026-11-27 (Cursor Agent docs)"
+
+  - agent_id: devin
+    kind: bot_account
+    match: "(?i)devin-ai-integration\\[bot\\]"
+    notes: "Cognition Devin GitHub App bot identity"
+    last_verified: "2026-11-27 (Devin GitHub integration docs)"
+
+  - agent_id: aider
+    kind: trailer
+    key: co-authored-by
+    match: "(?i)aider\\b.*@aider\\.chat"
+    notes: "Aider --attribute-co-authored-by git trailer"
+    last_verified: "2026-11-27 (Aider git attribution docs)"
+
+  - agent_id: aider
+    kind: bot_account
+    match: "(?i)\\(aider\\)\\s*<"
+    notes: "Aider default author name suffix"
+    last_verified: "2026-11-27 (Aider git attribution docs)"
+
+tooling_files:
+  - CLAUDE.md
+  - AGENTS.md
+  - .cursor/rules
+  - .cursorrules
+  - .github/copilot-instructions.md
+  - .windsurfrules
+  - GEMINI.md
+  - .aider.conf.yml

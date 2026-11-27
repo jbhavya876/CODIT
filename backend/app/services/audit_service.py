@@ -282,6 +282,7 @@ def create_staged_audit(
 def save_history_result(audit_id: str, history_result: Any) -> None:
     """Persist scrubbed HistoryResult (no messages/names/emails/source) on AuditRow."""
     cov_dict = history_result.coverage.model_dump()
+    history_findings = [f.model_dump() for f in getattr(history_result, "findings", [])]
     proc_dict = {
         "source_commit": history_result.source_commit,
         "source_tree": history_result.source_tree,
@@ -304,6 +305,8 @@ def save_history_result(audit_id: str, history_result: Any) -> None:
             }
             for c in history_result.commits
         ],
+        "findings": history_findings,
+        "attribution": getattr(history_result, "attribution", {}) or {},
         "head_tooling_present": history_result.head_tooling_present,
         "series": history_result.series,
     }
@@ -402,8 +405,29 @@ def run_audit_pipeline(
         ast_map = parse_codebase_ast(entries)
         emit_event(audit_id, "parse", "parse_done", data={"ast_files": len(ast_map)})
 
-        # 3. Run collectors
+        # 3. Run collectors + merge persisted history findings (if any)
         findings = run_all_collectors(entries, deps, ast_map)
+        existing_row = get_audit_row(audit_id)
+        if existing_row and existing_row.process_json:
+            for hf in existing_row.process_json.get("findings", []):
+                findings.append(
+                    AuditFinding(
+                        id=hf["id"],
+                        dimension=hf["dimension"],
+                        severity=hf["severity"],
+                        confidence=hf["confidence"],
+                        description=hf["description"],
+                        evidence_file=hf["evidence_file"],
+                        evidence_line=hf.get("evidence_line"),
+                        rule_id=hf["rule_id"],
+                        remediation=hf.get("remediation", ""),
+                        component_id=hf.get("component_id"),
+                        fingerprint=hf.get("fingerprint", hf["id"]),
+                        basis=hf.get("basis", "HISTORY PROOF"),
+                        commit_sha=hf.get("commit_sha"),
+                        params=hf.get("params", {}),
+                    )
+                )
         emit_event(audit_id, "collect", "collect_done", data={"findings_count": len(findings)})
 
         # 4. Deterministic scoring (v1.0.0 in P0; v2.0.0 added in P6)

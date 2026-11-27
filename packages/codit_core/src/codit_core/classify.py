@@ -52,7 +52,10 @@ MANIFEST_NAMES = LOCKFILE_NAMES | {
 
 
 def _posix_path(path_str: str) -> str:
-    return path_str.replace("\\", "/").lstrip("./")
+    norm = path_str.replace("\\", "/")
+    while norm.startswith("./"):
+        norm = norm[2:]
+    return norm
 
 
 def is_test_file(path_str: str) -> bool:

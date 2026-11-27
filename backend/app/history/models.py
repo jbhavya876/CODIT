@@ -1,4 +1,4 @@
-"""P1 History Ingestion models validated strictly as JSON across process boundary."""
+"""P1/P2/P3 History Ingestion models validated strictly as JSON across process boundary."""
 
 from __future__ import annotations
 
@@ -21,28 +21,7 @@ class HistoryCoverage(BaseModel):
     caps_hit: List[str] = Field(default_factory=list)
     skipped_deep_commits: int = 0
     blobs_unavailable: int = 0
-
-
-class AddedLineModel(BaseModel):
-    lineno: int
-    text: str
-
-
-class FileDeltaModel(BaseModel):
-    path: str
-    old_path: Optional[str] = None
-    status: Literal["A", "M", "D", "R"]
-    kind: Literal["test", "ci", "gate_config", "generated", "manifest", "source", "other"]
-    language: Optional[str] = None
-    added: List[AddedLineModel] = Field(default_factory=list)
-    removed_count: int = 0
-    added_count: int = 0
-    before_metrics: Optional[Dict[str, Any]] = None
-    after_metrics: Optional[Dict[str, Any]] = None
-    before_text: Optional[str] = None
-    after_text: Optional[str] = None
-    before_blob_sha: Optional[str] = None
-    after_blob_sha: Optional[str] = None
+    notes: List[str] = Field(default_factory=list)
 
 
 class CommitRecord(BaseModel):
@@ -60,7 +39,23 @@ class CommitRecord(BaseModel):
     prod_lines_delta: int = 0
     test_lines_delta: int = 0
     shallow_baseline: bool = False
-    files: List[FileDeltaModel] = Field(default_factory=list)
+
+
+class HistoryFindingRecord(BaseModel):
+    id: str
+    dimension: str
+    severity: str
+    confidence: str
+    description: str
+    evidence_file: str
+    evidence_line: Optional[int] = None
+    rule_id: str
+    remediation: str = ""
+    component_id: Optional[str] = None
+    fingerprint: str
+    basis: str
+    commit_sha: Optional[str] = None
+    params: Dict[str, Any] = Field(default_factory=dict)
 
 
 class HistoryResult(BaseModel):
@@ -68,8 +63,9 @@ class HistoryResult(BaseModel):
     source_commit: Optional[str] = None
     source_tree: Optional[str] = None
     commits: List[CommitRecord] = Field(default_factory=list)
+    findings: List[HistoryFindingRecord] = Field(default_factory=list)
+    attribution: Dict[str, Any] = Field(default_factory=dict)
     head_tooling_present: Dict[str, bool] = Field(default_factory=dict)
     head_secrets: List[Dict[str, Any]] = Field(default_factory=list)
-    head_focus_markers: List[Dict[str, Any]] = Field(default_factory=list)
     series: List[Dict[str, Any]] = Field(default_factory=list)
     ownership: Dict[str, Any] = Field(default_factory=dict)

@@ -282,9 +282,12 @@ def test_adversarial_a6_gitlink_symlink_and_skipped_deep(tmp_path, monkeypatch):
 
     res = walk_history(repo_dir, HistoryOptions(max_commits=10))
     assert res.coverage.assessed is True
-    last_paths = {f.path for f in res.commits[-1].files}
-    assert "evil_link" not in last_paths
-    assert "submod" not in last_paths
+    assert res.commits[-1].prod_lines_delta == 0
+    dumped = res.model_dump_json()
+    assert "evil_link" not in dumped
+    assert "submod" not in dumped
+    assert "/etc/passwd" not in dumped
+    assert len(res.findings) == 0
 
     # Verify HISTORY_MAX_FILES_PER_COMMIT triggers skipped_deep
     deep_dir = tmp_path / "deep_repo"

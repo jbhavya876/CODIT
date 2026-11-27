@@ -1,0 +1,245 @@
+# Machine-readable CODIT Rule Catalog (Section 8)
+# Feeds codit-guard explain, SARIF driver metadata, docs/RUBRIC.md, and UI labels.
+
+rules:
+  AGT-001:
+    title: "Tests removed alongside the code they cover"
+    dimension: agent_integrity
+    default_severity: high
+    basis: HISTORY PROOF
+    runs_in: [history, guard]
+    template: "Commit {short} removed {n} test(s) from {path} and also changed code those tests cover."
+    rationale: "Deleting a failing test while modifying the module under test hides regressions instead of fixing them."
+    example: "Removing `test_refund_negative` in the same commit that edits `billing/refund.py`."
+    remediation: "Restore the removed test cases or replace them with assertions covering the updated behavior."
+
+  AGT-002:
+    title: "Tests removed without matching production code removal"
+    dimension: agent_integrity
+    default_severity: medium
+    basis: HISTORY PROOF
+    runs_in: [history, guard]
+    template: "Commit {short} removed {n} test(s) from {path} with no matching production-code removal."
+    rationale: "Shrinking test suites without retiring the underlying functionality reduces verification coverage silently."
+    example: "Removing 3+ tests from `tests/test_auth.py` while production files remain intact."
+    remediation: "Restore removed tests or split/reorganize with explicit replacement coverage."
+
+  AGT-003:
+    title: "Existing tests newly skipped"
+    dimension: agent_integrity
+    default_severity: medium
+    basis: AST PROOF
+    runs_in: [history, guard]
+    template: "Commit {short} disabled {n} existing test(s) in {path}."
+    rationale: "Adding skip decorators or `.skip` modifiers makes broken tests pass CI without verification."
+    example: "Adding `@pytest.mark.skip` or `it.skip(...)` to an existing test."
+    remediation: "Fix the failing assertion or root cause rather than skipping the test."
+
+  AGT-004:
+    title: "Assertions removed from surviving tests"
+    dimension: agent_integrity
+    default_severity: medium
+    basis: HISTORY PROOF
+    runs_in: [history, guard]
+    template: "Commit {short} reduced assertions in {n} surviving test(s) in {path}."
+    rationale: "Leaving a test function executing with zero or fewer assertions preserves pass counts while stripping verification."
+    example: "Removing `assert result.ok` from `test_checkout` leaving no assertions."
+    remediation: "Restore explicit behavioral assertions for all exercised code paths."
+
+  AGT-005:
+    title: "Trivially-true assertion introduced"
+    dimension: agent_integrity
+    default_severity: high
+    basis: AST PROOF
+    runs_in: [history, guard]
+    template: "Commit {short} added an assertion that cannot fail ({form}) in {path}."
+    rationale: "Tautological assertions such as `assert True` or `expect(x).toBe(x)` always succeed regardless of application behavior."
+    example: "`assert True` or `expect(true).toBe(true)` on an added line."
+    remediation: "Replace tautological checks with assertions against real computed outputs."
+
+  AGT-006:
+    title: "Assertion loosened"
+    dimension: agent_integrity
+    default_severity: low
+    basis: PATTERN
+    runs_in: [history, guard]
+    template: "Commit {short} replaced strict assertions with weaker truthiness/non-null checks in {path}."
+    rationale: "Relaxing exact value equality to `is not None` or `.toBeDefined()` can mask incorrect results."
+    example: "Replacing `assertEqual(res.code, 200)` with `assert res.code is not None`."
+    remediation: "Assert expected values and invariants rather than mere non-null presence."
+
+  AGT-007:
+    title: "CI verification step weakened or removed"
+    dimension: agent_integrity
+    default_severity: high
+    basis: PATTERN
+    runs_in: [history, guard]
+    template: "Commit {short} weakened a {step_class} step in a CI workflow ({change})."
+    rationale: "Bypassing exit codes with `|| true` or `continue-on-error: true` prevents CI from blocking broken merges."
+    example: "Adding `continue-on-error: true` or `|| true` to a pytest/eslint/mypy step."
+    remediation: "Keep verification steps blocking; fix underlying test, lint, or typecheck errors."
+
+  AGT-008:
+    title: "Quality gate lowered"
+    dimension: agent_integrity
+    default_severity: medium
+    basis: PATTERN
+    runs_in: [history, guard]
+    template: "Commit {short} lowered a quality threshold ({change}) in {path}."
+    rationale: "Lowering coverage thresholds, lint severities, or TypeScript strictness weakens baseline enforcement."
+    example: "Reducing `--cov-fail-under` from 85 to 40 or changing `tsconfig` `strict` from `true` to `false`."
+    remediation: "Restore the prior gate threshold and bring changed code into compliance."
+
+  AGT-009:
+    title: "Suppression directives added"
+    dimension: agent_integrity
+    default_severity: low
+    basis: PATTERN
+    runs_in: [history, guard]
+    template: "Commit {short} added {n} linter/security suppression directive(s) in {path}."
+    rationale: "Bursts of inline suppressions or security-rule suppressions beside dangerous calls bypass static safeguards."
+    example: "Adding `# nosec` next to `shell=True` or bursts of 5+ `# noqa` directives."
+    remediation: "Resolve the underlying lint/security issue or limit suppressions to narrowly scoped reviewed exceptions."
+
+  AGT-010:
+    title: "Secret present in history, absent at HEAD"
+    dimension: security
+    default_severity: high
+    basis: PATTERN
+    runs_in: [history]
+    template: "A {kind} credential was committed in {short} and is absent at HEAD. Rotate it, then purge history."
+    rationale: "Credentials removed in later commits remain extractable from git history until rotated and purged."
+    example: "An API token added in commit 3 and deleted in commit 5."
+    remediation: "Immediately rotate/revoke the exposed credential and rewrite git history if required."
+
+  AGT-011:
+    title: "Large change without test changes"
+    dimension: agent_integrity
+    default_severity: low
+    basis: HISTORY PROOF
+    runs_in: [history, guard]
+    template: "Commit {short} changed {files} files ({lines} production lines) with zero test file updates."
+    rationale: "Unusually large changes touching no tests carry elevated risk of unverified behavior changes."
+    example: "Modifying >= 800 production lines or >= 40 files without adding or updating test files."
+    remediation: "Add targeted regression and unit tests exercising the modified modules."
+
+  AGT-012:
+    title: "Focus marker present at HEAD"
+    dimension: agent_integrity
+    default_severity: medium
+    basis: AST PROOF
+    runs_in: [history, guard]
+    template: "Focus marker ({form}) is present in {path} and restricts test execution."
+    rationale: "Test focus modifiers (`.only`, `fit`, `fdescribe`) cause test runners to silently skip the rest of the suite."
+    example: "`it.only('should process order', ...)` committed to a test file."
+    remediation: "Remove focus markers so the full test suite executes."
+
+  GRD-001:
+    title: "Guard policy or baseline modified"
+    dimension: agent_integrity
+    default_severity: high
+    basis: HISTORY PROOF
+    runs_in: [guard]
+    template: "Proposed change modifies guard policy/baseline file {path}."
+    rationale: "Allowing an unreviewed edit or automated session to relax `.codit.yml` or `.codit/baseline.json` undermines local safeguards."
+    example: "Adding a broad suppression rule inside `.codit.yml`."
+    remediation: "Review policy or baseline changes separately with explicit maintainer approval."
+
+  GRD-002:
+    title: "Destructive command targets tests or CI"
+    dimension: agent_integrity
+    default_severity: high
+    basis: PATTERN
+    runs_in: [guard]
+    template: "Command ({command}) targets verification path {path}. This check is best-effort and not complete."
+    rationale: "Destructive shell commands (`rm`, `mv`, `truncate`, `sed -i`, redirects) targeting tests or CI can remove safeguards outside file edit tools."
+    example: "`rm tests/test_auth.py` or `sed -i ... .github/workflows/ci.yml`."
+    remediation: "Avoid deleting or rewriting test/CI paths directly via shell commands."
+
+  LIC-001:
+    title: "Strong-copyleft dependency"
+    dimension: licenses
+    default_severity: high
+    basis: PATTERN
+    runs_in: [audit, guard]
+    template: "Production dependency {name}@{version} is licensed {spdx} (strong copyleft)."
+    rationale: "Strong copyleft dependencies may impose reciprocal source disclosure obligations under proprietary or incompatible permissive projects."
+    example: "GPL-3.0-only dependency declared in `package.json` or `requirements.txt`."
+    remediation: "Review compatibility with counsel or replace with a permissively licensed alternative."
+
+  LIC-002:
+    title: "Network-copyleft dependency"
+    dimension: licenses
+    default_severity: high
+    basis: PATTERN
+    runs_in: [audit, guard]
+    template: "Production dependency {name}@{version} is licensed {spdx} (network copyleft)."
+    rationale: "Network copyleft terms extend obligations across hosted network interaction."
+    example: "AGPL-3.0-only or SSPL-1.0 production dependency."
+    remediation: "Review deployment and licensing terms with legal counsel."
+
+  LIC-003:
+    title: "Weak-copyleft dependency"
+    dimension: licenses
+    default_severity: low
+    basis: PATTERN
+    runs_in: [audit]
+    template: "Dependency {name}@{version} is licensed {spdx} (weak copyleft)."
+    rationale: "Weak copyleft licenses typically impose obligations on modified library files or static linking."
+    example: "LGPL-3.0 or MPL-2.0 dependency."
+    remediation: "Track notice and linking requirements in compliance documentation."
+
+  LIC-004:
+    title: "Unknown dependency license"
+    dimension: licenses
+    default_severity: medium
+    basis: PATTERN
+    runs_in: [audit]
+    template: "Production dependency {name}@{version} has an unresolved or unknown license ({spdx})."
+    rationale: "Packages without verifiable license metadata cannot be treated as permissive."
+    example: "Private or unparsed license declaration."
+    remediation: "Verify the package license upstream or declare an explicit review decision."
+
+  LIC-005:
+    title: "Source-available license dependency"
+    dimension: licenses
+    default_severity: high
+    basis: PATTERN
+    runs_in: [audit, guard]
+    template: "Dependency {name}@{version} carries source-available license {spdx}."
+    rationale: "Source-available licenses restrict commercial or production hosting rights."
+    example: "BUSL-1.1 or Elastic-2.0 dependency."
+    remediation: "Confirm permitted use cases with counsel before shipping."
+
+  LIC-006:
+    title: "Missing project license declaration"
+    dimension: licenses
+    default_severity: medium
+    basis: PATTERN
+    runs_in: [audit]
+    template: "No project license declaration was resolved for {path}."
+    rationale: "Compatibility assessment requires knowing the target project's own licensing posture."
+    example: "Missing LICENSE file, manifest license field, and `.codit.yml` `project_license`."
+    remediation: "Add a LICENSE file or declare `project_license` in `.codit.yml`."
+
+  LIC-007:
+    title: "Foreign license header in source file"
+    dimension: licenses
+    default_severity: medium
+    basis: PATTERN
+    runs_in: [audit]
+    template: "Source file {path} declares license header {spdx}, which differs from project license."
+    rationale: "Mixed license headers can indicate copied third-party snippets with conflicting terms."
+    example: "`SPDX-License-Identifier: GPL-3.0-only` inside an MIT project file."
+    remediation: "Verify provenance and license compatibility of the headered code."
+
+  LIC-008:
+    title: "Vendored directory license mismatch"
+    dimension: licenses
+    default_severity: medium
+    basis: PATTERN
+    runs_in: [audit]
+    template: "Vendored license file in {path} ({spdx}) differs from project license and is undeclared."
+    rationale: "Undeclared third-party vendored code misses dependency inventory and license review."
+    example: "`vendor/libfoo/LICENSE` with differing terms and no manifest entry."
+    remediation: "Document or declare vendored third-party components explicitly."
