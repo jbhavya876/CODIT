@@ -77,3 +77,75 @@ def test_db_and_filesystem_zero_source_and_zero_canary_persistence(tmp_path):
                     assert "def super_secret_impl" not in row_txt, f"Raw code leaked into DB table {tname}!"
         finally:
             conn.close()
+
+
+def test_offline_keygen_rotation_and_secret_bootstrap(tmp_path, capsys):
+    """Verify keygen_attest & bootstrap_env never echo secrets and preserve retired public keys."""
+    from scripts.bootstrap_env import bootstrap_env_file
+    from scripts.keygen_attest import generate_keypair
+    import json
+
+    key_a = tmp_path / "sec_a.key"
+    pub_file = tmp_path / "keys_public.json"
+    p1 = generate_keypair(kid="2026-11-a", key_out=key_a, keys_public_path=pub_file, publish=True)
+    assert p1["status"] == "active" and p1["kid"] == "2026-11-a"
+    seed_a = key_a.read_text(encoding="utf-8")
+    assert "ATTEST_SIGNING_KEY=" in seed_a
+
+    key_b = tmp_path / "sec_b.key"
+    p2 = generate_keypair(kid="2027-01-b", key_out=key_b, keys_public_path=pub_file, publish=True)
+    doc = json.loads(pub_file.read_text(encoding="utf-8"))
+    by_kid = {k["kid"]: k for k in doc["keys"]}
+    assert by_kid["2027-01-b"]["status"] == "active"
+    assert by_kid["2026-11-a"]["status"] == "retired"
+
+    env_file = tmp_path / "prod.env"
+    written = bootstrap_env_file(env_file)
+    assert set(written) == {"ADMIN_TOKEN", "COOKIE_SECRET", "PUBLIC_BASE_URL"}
+    env_txt = env_file.read_text(encoding="utf-8")
+    out = capsys.readouterr().out
+    assert seed_a.split("ATTEST_SIGNING_KEY=")[1].strip() not in out
+    assert "ADMIN_TOKEN=" in env_txt
+    for line in env_txt.splitlines():
+        if line.startswith(("ADMIN_TOKEN=", "COOKIE_SECRET=")):
+            val = line.split("=", 1)[1]
+            assert val not in out
+
+
+def test_walk_history_handles_missing_promisor_blob_in_rename_detector(tmp_path):
+    """Regression: missing filtered blob SHA during RenameDetector falls back cleanly without KeyError."""
+    from dulwich.repo import Repo
+
+    repo_dir = tmp_path / "promisor_repo"
+    rb = GitRepoBuilder(repo_dir)
+    rb.write("assets/big.bin", "Z" * 8000)
+    rb.write("src/a.py", "def f():\n    return 1\n")
+    rb.commit("add big asset")
+
+    rb.remove("assets/big.bin")
+    rb.write("assets/big_moved.bin", "Z" * 8000)
+    c2 = rb.commit("move big asset")
+
+    # Delete the blob object for assets/big.bin from loose/pack storage?
+    # Simpler: create a bare repo with --filter=blob:limit=1k or delete loose blob file directly
+    repo = Repo(str(repo_dir))
+    try:
+        c_obj = repo.object_store[c2.encode("ascii")]
+        parent_obj = repo.object_store[c_obj.parents[0]]
+        tree_obj = repo.object_store[parent_obj.tree]
+        for entry in tree_obj.items():
+            if entry.path == b"assets":
+                sub = repo.object_store[entry.sha]
+                for sub_e in sub.items():
+                    if sub_e.path == b"big.bin":
+                        sha_hex = sub_e.sha.decode("ascii")
+                        obj_file = repo_dir / ".git" / "objects" / sha_hex[:2] / sha_hex[2:]
+                        if obj_file.exists():
+                            os.chmod(obj_file, 0o600)
+                            obj_file.unlink()
+    finally:
+        repo.close()
+
+    res = walk_history(repo_dir, HistoryOptions(max_commits=20))
+    assert res.coverage.assessed is True
+    assert res.coverage.blobs_unavailable >= 1

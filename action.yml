@@ -17,6 +17,14 @@ inputs:
     description: "Pinned codit-guard version"
     required: false
     default: "3.0.0"
+  install-from:
+    description: "Package source: pypi or github (uses git subdirectory until published on PyPI)"
+    required: false
+    default: "github"
+  repo-ref:
+    description: "Git ref or tag when install-from=github"
+    required: false
+    default: "v1"
 
 runs:
   using: "composite"
@@ -31,7 +39,13 @@ runs:
     - name: Install codit-guard
       shell: bash
       run: |
-        pip install --disable-pip-version-check "codit-guard==${{ inputs.version }}"
+        if [ "${{ inputs.install-from }}" = "pypi" ]; then
+          pip install --disable-pip-version-check "codit-guard==${{ inputs.version }}"
+        else
+          pip install --disable-pip-version-check \
+            "git+https://github.com/jbhavya876/CODIT.git@${{ inputs.repo-ref }}#subdirectory=packages/codit_core" \
+            "git+https://github.com/jbhavya876/CODIT.git@${{ inputs.repo-ref }}#subdirectory=packages/codit_guard"
+        fi
 
     - name: Run codit-guard check
       id: guard

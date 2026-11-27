@@ -6,7 +6,19 @@ build-backend = "setuptools.build_meta"
 name = "codit-guard"
 version = "3.0.0"
 description = "Local-first diff verification gate for coding agents, commits, and CI"
+readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.10"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Quality Assurance",
+]
 dependencies = [
     "codit-core>=3.0.0",
     "pyyaml>=6.0",
@@ -18,6 +30,10 @@ verify = ["cryptography>=42.0"]
 
 [project.scripts]
 codit-guard = "codit_guard.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/jbhavya876/CODIT"
+Repository = "https://github.com/jbhavya876/CODIT"
 
 [tool.setuptools.packages.find]
 where = ["src"]

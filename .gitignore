@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+.secrets/
 
 # python
 __pycache__/
@@ -14,6 +15,7 @@ venv/
 node_modules/
 frontend/dist/
 dist/
+build/
 
 # os / editors
 .DS_Store

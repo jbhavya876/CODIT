@@ -198,19 +198,56 @@ def _compute_line_delta(before_text: str, after_text: str) -> Tuple[Tuple[AddedL
     b_lines = before_text.splitlines()[:_MAX_DIFF_LINES_PER_FILE]
     a_lines = after_text.splitlines()[:_MAX_DIFF_LINES_PER_FILE]
 
-    matcher = difflib.SequenceMatcher(None, b_lines, a_lines, autojunk=False)
+    # Fast O(N) common prefix/suffix trim before difflib to avoid quadratic SequenceMatcher stalls.
+    prefix = 0
+    min_len = min(len(b_lines), len(a_lines))
+    while prefix < min_len and b_lines[prefix] == a_lines[prefix]:
+        prefix += 1
+
+    b_end = len(b_lines)
+    a_end = len(a_lines)
+    while b_end > prefix and a_end > prefix and b_lines[b_end - 1] == a_lines[a_end - 1]:
+        b_end -= 1
+        a_end -= 1
+
+    mid_b = b_lines[prefix:b_end]
+    mid_a = a_lines[prefix:a_end]
+    if not mid_b and not mid_a:
+        return (), (), 0, 0
+
     added_lines: List[AddedLine] = []
     removed_lines: List[str] = []
     added_count = 0
     removed_count = 0
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag in ("replace", "delete"):
-            removed_count += i2 - i1
-            removed_lines.extend(b_lines[i1:i2])
-        if tag in ("replace", "insert"):
-            added_count += j2 - j1
-            for offset, text in enumerate(a_lines[j1:j2], start=j1 + 1):
-                added_lines.append(AddedLine(lineno=offset, text=text))
+
+    if len(mid_b) * len(mid_a) <= 1_000_000 and (len(mid_b) + len(mid_a)) <= 4_000:
+        matcher = difflib.SequenceMatcher(None, mid_b, mid_a, autojunk=False)
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag in ("replace", "delete"):
+                removed_count += i2 - i1
+                removed_lines.extend(mid_b[i1:i2])
+            if tag in ("replace", "insert"):
+                added_count += j2 - j1
+                for offset, text in enumerate(mid_a[j1:j2], start=prefix + j1 + 1):
+                    added_lines.append(AddedLine(lineno=offset, text=text))
+    else:
+        from collections import Counter
+
+        a_counts = Counter(mid_a)
+        b_counts = Counter(mid_b)
+        for line in mid_b:
+            if a_counts[line] > 0:
+                a_counts[line] -= 1
+            else:
+                removed_count += 1
+                removed_lines.append(line)
+        for offset, line in enumerate(mid_a, start=prefix + 1):
+            if b_counts[line] > 0:
+                b_counts[line] -= 1
+            else:
+                added_count += 1
+                added_lines.append(AddedLine(lineno=offset, text=line))
+
     return tuple(added_lines), tuple(removed_lines), added_count, removed_count
 
 
@@ -495,15 +532,34 @@ def walk_history(
                 )
                 continue
 
-            changes: List[TreeChange] = list(
-                tree_changes(
-                    store,
-                    prev_tree_id,
-                    commit.tree,
-                    want_unchanged=False,
-                    rename_detector=rename_detector,
+            try:
+                changes: List[TreeChange] = list(
+                    tree_changes(
+                        store,
+                        prev_tree_id,
+                        commit.tree,
+                        want_unchanged=False,
+                        rename_detector=rename_detector,
+                    )
                 )
-            )
+            except KeyError:
+                # Partial clones (`--filter=blob:limit=...`) omit oversized blobs cleanly;
+                # fall back to non-rename tree diff so missing promisor blobs never crash walk.
+                stats_counters["blobs_unavailable"] += 1
+                try:
+                    changes = list(
+                        tree_changes(
+                            store,
+                            prev_tree_id,
+                            commit.tree,
+                            want_unchanged=False,
+                            rename_detector=None,
+                        )
+                    )
+                except KeyError:
+                    skipped_deep_commits += 1
+                    stats_counters["blobs_unavailable"] += 1
+                    changes = []
             files_changed = len(changes)
             if files_changed > max_files_per_commit:
                 skipped_deep_commits += 1

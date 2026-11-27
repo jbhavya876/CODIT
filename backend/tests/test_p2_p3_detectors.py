@@ -353,3 +353,22 @@ def test_property_body_hash_invariant_under_whitespace_and_comments(pad: int, co
     assert len(jm1.cases) == 1 and len(jm2.cases) == 1
     assert jm1.cases[0].body_hash == jm2.cases[0].body_hash
     assert jm1.cases[0].assertions == jm2.cases[0].assertions == 1
+
+
+def test_agt011_ignores_large_docs_only_commits(tmp_path):
+    """Real-world regression: many Markdown/doc files with zero source/manifest changes must not trigger AGT-011."""
+    def docs_only(rb: GitRepoBuilder, _):
+        for i in range(45):
+            rb.write(f"docs/section_{i}.md", f"# Section {i}\n\nDocumentation text.\n")
+        rb.commit("add 45 glossary and doc pages")
+
+    res_docs, _ = _build_and_walk(tmp_path, "docs_only", docs_only)
+    assert "AGT-011" not in {f.rule_id for f in res_docs.findings}
+
+    def prod_many(rb: GitRepoBuilder, _):
+        for i in range(45):
+            rb.write(f"src/mod_{i}.py", f"VAL_{i} = {i}\n")
+        rb.commit("add 45 source modules without tests")
+
+    res_prod, _ = _build_and_walk(tmp_path, "prod_many", prod_many)
+    assert "AGT-011" in {f.rule_id for f in res_prod.findings}

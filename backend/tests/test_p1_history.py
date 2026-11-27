@@ -300,3 +300,18 @@ def test_adversarial_a6_gitlink_symlink_and_skipped_deep(tmp_path, monkeypatch):
     assert res_deep.coverage.skipped_deep_commits >= 1
     assert res_deep.commits[0].skipped_deep is True
 
+
+def test_compute_line_delta_linear_on_large_diffs():
+    """Large diffs must finish quickly without quadratic difflib stalls and keep accurate added line numbers."""
+    import time
+    from backend.app.history.walker import _compute_line_delta
+
+    before = "\n".join(f"old_line_{i}" for i in range(6000)) + "\n"
+    after = "\n".join(f"new_line_{i}" for i in range(6000)) + "\n"
+    t0 = time.perf_counter()
+    added, removed, a_cnt, r_cnt = _compute_line_delta(before, after)
+    elapsed = time.perf_counter() - t0
+    assert elapsed < 1.0
+    assert a_cnt == 6000 and r_cnt == 6000
+    assert added[0].lineno == 1 and added[-1].lineno == 6000
+

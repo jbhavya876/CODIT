@@ -76,21 +76,18 @@ def detect_agt009(commit: CommitDelta, policy: PolicyThresholds) -> List[CoreFin
 
 
 def detect_agt011(commit: CommitDelta, policy: PolicyThresholds) -> List[CoreFinding]:
-    """Large change without test changes (excludes generated/lockfiles/vendor/min.js/snapshots)."""
-    non_generated_files = [f for f in commit.files if f.kind != "generated"]
+    """Large code/manifest change without test changes (excludes generated and pure-docs commits)."""
     test_files_changed = any(f.kind == "test" for f in commit.files)
     if test_files_changed:
         return []
 
-    prod_lines = sum(
-        (f.added_count + f.removed_count)
-        for f in non_generated_files
-        if f.kind in ("source", "manifest")
-    )
-    non_gen_count = len(non_generated_files)
+    prod_files = [f for f in commit.files if f.kind in ("source", "manifest")]
+    prod_lines = sum(f.added_count + f.removed_count for f in prod_files)
+    prod_file_count = len(prod_files)
 
-    if commit.skipped_deep or prod_lines >= policy.megacommit_lines or non_gen_count >= policy.megacommit_files:
-        evidence_path = non_generated_files[0].path if non_generated_files else "repository"
+    if commit.skipped_deep or prod_lines >= policy.megacommit_lines or prod_file_count >= policy.megacommit_files:
+        evidence_path = prod_files[0].path if prod_files else "repository"
+        file_count = commit.files_changed if commit.skipped_deep else prod_file_count
         return [
             make_core_finding(
                 rule_id="AGT-011",
@@ -100,10 +97,10 @@ def detect_agt011(commit: CommitDelta, policy: PolicyThresholds) -> List[CoreFin
                 severity="low",
                 basis="HISTORY PROOF",
                 commit_sha=commit.sha,
-                match_key=f"{commit.short}:{non_gen_count}:{prod_lines}",
+                match_key=f"{commit.short}:{file_count}:{prod_lines}",
                 params={
                     "short": commit.short,
-                    "files": commit.files_changed if commit.skipped_deep else non_gen_count,
+                    "files": file_count,
                     "lines": prod_lines,
                     "path": evidence_path,
                 },
